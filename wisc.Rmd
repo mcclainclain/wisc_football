@@ -1,0 +1,37 @@
+---
+title: "Wisconsin Football Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=T,eval=T,message=F,warning=F,fig.align='center')
+library(tidyverse)
+library(sqldf)
+library(lemon)
+library(kableExtra)
+```
+
+Read in player data from scraped `.csv` file.
+
+```{r}
+players = read_csv("players.csv") %>% select(Name, Pos, Hometown, Year)
+
+
+player_years = sqldf("SELECT Name, MIN(YEAR) AS FirstYear, MAX(YEAR) AS LastYear FROM players GROUP BY Name")
+
+players = sqldf("SELECT DISTINCT players.Name, players.Pos, players.Hometown, player_years.FirstYear as FirstYear, player_years.LastYear as LastYear FROM players LEFT JOIN player_years ON players.Name=player_years.Name")
+```
+
+This removed all duplicates, while also keeping for what years those players played. However there are still some duplicates because a player could have switched positions between seasons. See this in the case of FB/OLB/TE Riley Nowakowski. We still have three individual rows for this one player.
+
+```{r}
+players %>% 
+  filter(Name == "Riley Nowakowski") %>%
+  kbl() %>% 
+  kable_classic_2(bootstrap_options = c("striped", "hover"), full_width = F, font_size=20)
+  
+```
+```{r}
+sqldf("SELECT Name, COUNT(Pos) as Pos, Hometown, FirstYear, LastYear FROM players GROUP BY Name")
+```
+
