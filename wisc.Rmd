@@ -9,12 +9,24 @@ library(tidyverse)
 library(sqldf)
 library(lemon)
 library(kableExtra)
+library(ggmap)
+library(leaflet)
 ```
+
+**Helper functions**
+
+```{r}
+show_table = function(df, caption="") {
+  return (df %>% kbl(caption = caption) %>% kable_classic_2(bootstrap_options = c("striped", "hover"), full_width = F, font_size=20, html_font="Cambria"))
+}
+```
+
+## Setup
 
 Read in player data from scraped `.csv` file.
 
 ```{r}
-players = read_csv("players.csv") %>% select(Name, Pos, Hometown, Year)
+players = read_csv("players.csv")
 
 
 player_years = sqldf("SELECT Name, MIN(YEAR) AS FirstYear, MAX(YEAR) AS LastYear FROM players GROUP BY Name")
@@ -26,12 +38,87 @@ This removed all duplicates, while also keeping for what years those players pla
 
 ```{r}
 players %>% 
-  filter(Name == "Riley Nowakowski") %>%
-  kbl() %>% 
-  kable_classic_2(bootstrap_options = c("striped", "hover"), full_width = F, font_size=20)
-  
+  filter(Name == "Riley Nowakowski") %>% 
+  show_table()
 ```
+
+
 ```{r}
-sqldf("SELECT Name, COUNT(Pos) as Pos, Hometown, FirstYear, LastYear FROM players GROUP BY Name")
+agg = aggregate(Pos~Name, players, FUN=c)
+
+towns = c()
+firstyears = c()
+lastyears = c()
+
+for (i in 1:length(agg$Name)) {
+  player = head(players[players$Name == agg$Name[i],], 1)
+  towns = append(towns, player$Hometown[1])
+  firstyears = append(firstyears, player$FirstYear[1])
+  lastyears = append(lastyears, player$LastYear[1])
+  
+}
+    
+players_no_dup = agg %>% 
+  mutate(Hometown = towns, FirstYear = firstyears, LastYear = lastyears)
+
+players_w_mult_pos = (nrow(players)-nrow(players_no_dup))/nrow(players) * 100
+
+tibble("Pos. Not Combined" = nrow(players), "Pos. Combined" = nrow(players_no_dup), "% of Multiple Position" = round(players_w_mult_pos, 2)) %>% 
+  show_table("Length of Players DF")
 ```
+
+> After this cell, we see that the length of the players DataFrame has decreased significantly, showing that we correctly identified players with multiple positions, and combined them to one row.We also showed that we have `r round(players_w_mult_pos, 2)`% of players that have played (officially) multiple positions throughout their careers at Wisconsin.
+
+
+## Hometowns
+
+The first part of this analysis will be geographical. Where are Wisconsin football players originating from? **How** has that trend changed over the past decade?
+
+### Graph Hometowns
+
+I created a [script](./geocodes.R) to map every Hometown to its longitude and latitude geocode. The main reason for doing this was so there wouldn't be a ton of calls to the Google Maps API every time I ran this `.rmd` file.
+
+```{r, include=F}
+readRenviron("./.Renviron")
+register_google(Sys.getenv("MAPSAPIKEY"))
+```
+
+
+```{r}
+geocodes = read_csv("geocodes.csv")
+```
+
+```{r}
+print_players = function(df) {
+  string = ""
+  if (is.na(df) || nrow(df) == 0){
+   return (NA)
+  }
+  for (i in 1:nrow(df)){
+    string = paste(string, df[i,], sep="\n")
+  }
+  return (string)
+}
+```
+
+```{r}
+town_players = c()
+for (town in geocodes$Hometown) {
+  town_players = append(town_players, list(players_no_dup[players_no_dup["Hometown"] == town,]))
+  
+  
+}
+
+print_players(players_no_dup[players_no_dup["Hometown"] == "Madison, Wis.",])
+geocodes$Players = town_players
+```
+
+```{r}
+m = leaflet() %>% 
+  addTiles() %>% 
+  addMarkers(geocodes$lon, geocodes$lat, popup=geocodes$Hometown)
+m
+```
+
+
 
