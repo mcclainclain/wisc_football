@@ -11,6 +11,9 @@ library(lemon)
 library(kableExtra)
 library(ggmap)
 library(leaflet)
+library(leaflet.providers)
+library(glue)
+library(geosphere)
 ```
 
 **Helper functions**
@@ -26,12 +29,12 @@ show_table = function(df, caption="") {
 Read in player data from scraped `.csv` file.
 
 ```{r}
-players = read_csv("players.csv")
+players_raw = read_csv("players.csv")
 
 
-player_years = sqldf("SELECT Name, MIN(YEAR) AS FirstYear, MAX(YEAR) AS LastYear FROM players GROUP BY Name")
+player_years = sqldf("SELECT Name, MIN(YEAR) AS FirstYear, MAX(YEAR) AS LastYear FROM players_raw GROUP BY Name")
 
-players = sqldf("SELECT DISTINCT players.Name, players.Pos, players.Hometown, player_years.FirstYear as FirstYear, player_years.LastYear as LastYear FROM players LEFT JOIN player_years ON players.Name=player_years.Name")
+players = sqldf("SELECT DISTINCT players_raw.Name, players_raw.Pos, players_raw.Hometown, player_years.FirstYear as FirstYear, player_years.LastYear as LastYear FROM players_raw LEFT JOIN player_years ON players_raw.Name=player_years.Name")
 ```
 
 This removed all duplicates, while also keeping for what years those players played. However there are still some duplicates because a player could have switched positions between seasons. See this in the case of FB/OLB/TE Riley Nowakowski. We still have three individual rows for this one player.
@@ -60,6 +63,10 @@ for (i in 1:length(agg$Name)) {
     
 players_no_dup = agg %>% 
   mutate(Hometown = towns, FirstYear = firstyears, LastYear = lastyears)
+
+# Individual town adjustment
+players_no_dup$Hometown[players_no_dup$Hometown == "Montreal, Wis."] = "Montreal, Wisconsin"
+players_no_dup$Hometown[players_no_dup$Hometown == "Howard, Kan."] = "Howard, Kansas"
 
 players_w_mult_pos = (nrow(players)-nrow(players_no_dup))/nrow(players) * 100
 
@@ -95,7 +102,9 @@ print_players = function(df) {
    return (NA)
   }
   for (i in 1:nrow(df)){
-    string = paste(string, df[i,], sep="\n")
+    row = df[i,]
+    player = ifelse(row$FirstYear == row$LastYear, glue('{row$Name}, {row$FirstYear}'), glue('{row$Name}, {row$FirstYear}-{row$LastYear}'))
+    string = paste(string, player, "<br>")
   }
   return (string)
 }
@@ -106,18 +115,47 @@ town_players = c()
 for (town in geocodes$Hometown) {
   town_players = append(town_players, list(players_no_dup[players_no_dup["Hometown"] == town,]))
   
-  
 }
 
-print_players(players_no_dup[players_no_dup["Hometown"] == "Madison, Wis.",])
 geocodes$Players = town_players
 ```
 
 ```{r}
 m = leaflet() %>% 
-  addTiles() %>% 
-  addMarkers(geocodes$lon, geocodes$lat, popup=geocodes$Hometown)
+  addProviderTiles(provider=providers$Esri.WorldGrayCanvas) %>% 
+  addCircleMarkers(geocodes$lon, geocodes$lat, popup=paste("<b>", geocodes$Hometown, "</b><br>", lapply(geocodes$Players, print_players)), label=geocodes$Hometown, radius=4.5, color="#C5050C", fillOpacity=1.0, stroke=FALSE)
 m
+```
+
+Getting distance from Madison, WI for all cities in our dataset.
+```{r}
+
+year_dists = players_raw
+# Fix the two individual cities
+players_raw$Hometown[year_dists$Hometown == "Howard, Kan."] = "Howard, Kansas"
+players_raw$Hometown[year_dists$Hometown == "Montreal, Wis."] = "Montreal, Wisconsin"
+madison_dists = c()
+madison = geocode("Madison WI")
+for (i in 1:nrow(players_raw)){
+  city = geocodes %>% filter(Hometown == players_raw$Hometown[i]) %>% select(lon, lat)
+  if (is.na(city$lon[1]) || is.na(city$lat[1])){
+    print(players_raw$Hometown[i])
+  }
+  madison_dists = append(madison_dists, distHaversine(madison, c(city$lon[1], city$lat[1])))
+}
+year_dists$dist_madison = madison_dists
+```
+
+Average Distance From Madison by Year
+```{r}
+avg_distances = year_dists %>% 
+  group_by(Year) %>% 
+  summarize(avg_dist = mean(dist_madison/1000))
+
+ggplot(avg_distances, aes(Year, avg_dist)) +
+  geom_col(fill="lightblue", color="black") +
+  ylab("Distance (km)") +
+  ggtitle("Average Distance from Madison of UW Football Players")
 ```
 
 

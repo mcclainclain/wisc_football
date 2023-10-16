@@ -4493,6 +4493,1111 @@ function asArray(value) {
 
 },{}]},{},[13]);
 </script>
+<script>(function (root, factory) {
+	if (typeof define === 'function' && define.amd) {
+		// AMD. Register as an anonymous module.
+		define(['leaflet'], factory);
+	} else if (typeof modules === 'object' && module.exports) {
+		// define a Common JS module that relies on 'leaflet'
+		module.exports = factory(require('leaflet'));
+	} else {
+		// Assume Leaflet is loaded into global object L already
+		factory(L);
+	}
+}(this, function (L) {
+	'use strict';
+
+	L.TileLayer.Provider = L.TileLayer.extend({
+		initialize: function (arg, options) {
+			var providers = L.TileLayer.Provider.providers;
+
+			var parts = arg.split('.');
+
+			var providerName = parts[0];
+			var variantName = parts[1];
+
+			if (!providers[providerName]) {
+				throw 'No such provider (' + providerName + ')';
+			}
+
+			var provider = {
+				url: providers[providerName].url,
+				options: providers[providerName].options
+			};
+
+			// overwrite values in provider from variant.
+			if (variantName && 'variants' in providers[providerName]) {
+				if (!(variantName in providers[providerName].variants)) {
+					throw 'No such variant of ' + providerName + ' (' + variantName + ')';
+				}
+				var variant = providers[providerName].variants[variantName];
+				var variantOptions;
+				if (typeof variant === 'string') {
+					variantOptions = {
+						variant: variant
+					};
+				} else {
+					variantOptions = variant.options;
+				}
+				provider = {
+					url: variant.url || provider.url,
+					options: L.Util.extend({}, provider.options, variantOptions)
+				};
+			}
+
+			// replace attribution placeholders with their values from toplevel provider attribution,
+			// recursively
+			var attributionReplacer = function (attr) {
+				if (attr.indexOf('{attribution.') === -1) {
+					return attr;
+				}
+				return attr.replace(/\{attribution.(\w*)\}/g,
+					function (match, attributionName) {
+						return attributionReplacer(providers[attributionName].options.attribution);
+					}
+				);
+			};
+			provider.options.attribution = attributionReplacer(provider.options.attribution);
+
+			// Compute final options combining provider options with any user overrides
+			var layerOpts = L.Util.extend({}, provider.options, options);
+			L.TileLayer.prototype.initialize.call(this, provider.url, layerOpts);
+		}
+	});
+
+	/**
+	 * Definition of providers.
+	 * see http://leafletjs.com/reference.html#tilelayer for options in the options map.
+	 */
+
+	L.TileLayer.Provider.providers = {
+		OpenStreetMap: {
+			url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 19,
+				attribution:
+					'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+			},
+			variants: {
+				Mapnik: {},
+				DE: {
+					url: 'https://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png',
+					options: {
+						maxZoom: 18
+					}
+				},
+				CH: {
+					url: 'https://tile.osm.ch/switzerland/{z}/{x}/{y}.png',
+					options: {
+						maxZoom: 18,
+						bounds: [[45, 5], [48, 11]]
+					}
+				},
+				France: {
+					url: 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
+					options: {
+						maxZoom: 20,
+						attribution: '&copy; OpenStreetMap France | {attribution.OpenStreetMap}'
+					}
+				},
+				HOT: {
+					url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+					options: {
+						attribution:
+							'{attribution.OpenStreetMap}, ' +
+							'Tiles style by <a href="https://www.hotosm.org/" target="_blank">Humanitarian OpenStreetMap Team</a> ' +
+							'hosted by <a href="https://openstreetmap.fr/" target="_blank">OpenStreetMap France</a>'
+					}
+				},
+				BZH: {
+					url: 'https://tile.openstreetmap.bzh/br/{z}/{x}/{y}.png',
+					options: {
+						attribution: '{attribution.OpenStreetMap}, Tiles courtesy of <a href="http://www.openstreetmap.bzh/" target="_blank">Breton OpenStreetMap Team</a>',
+						bounds: [[46.2, -5.5], [50, 0.7]]
+					}
+				}
+			}
+		},
+		OpenSeaMap: {
+			url: 'https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',
+			options: {
+				attribution: 'Map data: &copy; <a href="http://www.openseamap.org">OpenSeaMap</a> contributors'
+			}
+		},
+		OPNVKarte: {
+			url: 'https://tileserver.memomaps.de/tilegen/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 18,
+				attribution: 'Map <a href="https://memomaps.de/">memomaps.de</a> <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, map data {attribution.OpenStreetMap}'
+			}
+		},
+		OpenTopoMap: {
+			url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 17,
+				attribution: 'Map data: {attribution.OpenStreetMap}, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+			}
+		},
+		OpenRailwayMap: {
+			url: 'https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 19,
+				attribution: 'Map data: {attribution.OpenStreetMap} | Map style: &copy; <a href="https://www.OpenRailwayMap.org">OpenRailwayMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+			}
+		},
+		OpenFireMap: {
+			url: 'http://openfiremap.org/hytiles/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 19,
+				attribution: 'Map data: {attribution.OpenStreetMap} | Map style: &copy; <a href="http://www.openfiremap.org">OpenFireMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+			}
+		},
+		SafeCast: {
+			url: 'https://s3.amazonaws.com/te512.safecast.org/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 16,
+				attribution: 'Map data: {attribution.OpenStreetMap} | Map style: &copy; <a href="https://blog.safecast.org/about/">SafeCast</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+			}
+		},
+		Stadia: {
+			url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png',
+			options: {
+				maxZoom: 20,
+				attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors'
+			},
+			variants: {
+				AlidadeSmooth: {
+					url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png'
+				},
+				AlidadeSmoothDark: {
+					url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png'
+				},
+				OSMBright: {
+					url: 'https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}{r}.png'
+				},
+				Outdoors: {
+					url: 'https://tiles.stadiamaps.com/tiles/outdoors/{z}/{x}/{y}{r}.png'
+				}
+			}
+		},
+		Thunderforest: {
+			url: 'https://{s}.tile.thunderforest.com/{variant}/{z}/{x}/{y}.png?apikey={apikey}',
+			options: {
+				attribution:
+					'&copy; <a href="http://www.thunderforest.com/">Thunderforest</a>, {attribution.OpenStreetMap}',
+				variant: 'cycle',
+				apikey: '<insert your api key here>',
+				maxZoom: 22
+			},
+			variants: {
+				OpenCycleMap: 'cycle',
+				Transport: {
+					options: {
+						variant: 'transport'
+					}
+				},
+				TransportDark: {
+					options: {
+						variant: 'transport-dark'
+					}
+				},
+				SpinalMap: {
+					options: {
+						variant: 'spinal-map'
+					}
+				},
+				Landscape: 'landscape',
+				Outdoors: 'outdoors',
+				Pioneer: 'pioneer',
+				MobileAtlas: 'mobile-atlas',
+				Neighbourhood: 'neighbourhood'
+			}
+		},
+		CyclOSM: {
+			url: 'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 20,
+				attribution: '<a href="https://github.com/cyclosm/cyclosm-cartocss-style/releases" title="CyclOSM - Open Bicycle render">CyclOSM</a> | Map data: {attribution.OpenStreetMap}'
+			}
+		},
+		Hydda: {
+			url: 'https://{s}.tile.openstreetmap.se/hydda/{variant}/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 20,
+				variant: 'full',
+				attribution: 'Tiles courtesy of <a href="http://openstreetmap.se/" target="_blank">OpenStreetMap Sweden</a> &mdash; Map data {attribution.OpenStreetMap}'
+			},
+			variants: {
+				Full: 'full',
+				Base: 'base',
+				RoadsAndLabels: 'roads_and_labels'
+			}
+		},
+		Jawg: {
+			url: 'https://{s}.tile.jawg.io/{variant}/{z}/{x}/{y}{r}.png?access-token={accessToken}',
+			options: {
+				attribution:
+					'<a href="http://jawg.io" title="Tiles Courtesy of Jawg Maps" target="_blank">&copy; <b>Jawg</b>Maps</a> ' +
+					'{attribution.OpenStreetMap}',
+				minZoom: 0,
+				maxZoom: 22,
+				subdomains: 'abcd',
+				variant: 'jawg-terrain',
+				// Get your own Jawg access token here : https://www.jawg.io/lab/
+				// NB : this is a demonstration key that comes with no guarantee
+				accessToken: '<insert your access token here>',
+			},
+			variants: {
+				Streets: 'jawg-streets',
+				Terrain: 'jawg-terrain',
+				Sunny: 'jawg-sunny',
+				Dark: 'jawg-dark',
+				Light: 'jawg-light',
+				Matrix: 'jawg-matrix'
+			}
+		},
+		MapBox: {
+			url: 'https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}{r}?access_token={accessToken}',
+			options: {
+				attribution:
+					'&copy; <a href="https://www.mapbox.com/about/maps/" target="_blank">Mapbox</a> ' +
+					'{attribution.OpenStreetMap} ' +
+					'<a href="https://www.mapbox.com/map-feedback/" target="_blank">Improve this map</a>',
+				tileSize: 512,
+				maxZoom: 18,
+				zoomOffset: -1,
+				id: 'mapbox/streets-v11',
+				accessToken: '<insert your access token here>',
+			}
+		},
+		MapTiler: {
+			url: 'https://api.maptiler.com/maps/{variant}/{z}/{x}/{y}{r}.{ext}?key={key}',
+			options: {
+				attribution:
+					'<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
+				variant: 'streets',
+				ext: 'png',
+				key: '<insert your MapTiler Cloud API key here>',
+				tileSize: 512,
+				zoomOffset: -1,
+				minZoom: 0,
+				maxZoom: 21
+			},
+			variants: {
+				Streets: 'streets',
+				Basic: 'basic',
+				Bright: 'bright',
+				Pastel: 'pastel',
+				Positron: 'positron',
+				Hybrid: {
+					options: {
+						variant: 'hybrid',
+						ext: 'jpg'
+					}
+				},
+				Toner: 'toner',
+				Topo: 'topo',
+				Voyager: 'voyager'
+			}
+		},
+		Stamen: {
+			url: 'https://stamen-tiles-{s}.a.ssl.fastly.net/{variant}/{z}/{x}/{y}{r}.{ext}',
+			options: {
+				attribution:
+					'Map tiles by <a href="http://stamen.com">Stamen Design</a>, ' +
+					'<a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; ' +
+					'Map data {attribution.OpenStreetMap}',
+				subdomains: 'abcd',
+				minZoom: 0,
+				maxZoom: 20,
+				variant: 'toner',
+				ext: 'png'
+			},
+			variants: {
+				Toner: 'toner',
+				TonerBackground: 'toner-background',
+				TonerHybrid: 'toner-hybrid',
+				TonerLines: 'toner-lines',
+				TonerLabels: 'toner-labels',
+				TonerLite: 'toner-lite',
+				Watercolor: {
+					url: 'https://stamen-tiles-{s}.a.ssl.fastly.net/{variant}/{z}/{x}/{y}.{ext}',
+					options: {
+						variant: 'watercolor',
+						ext: 'jpg',
+						minZoom: 1,
+						maxZoom: 16
+					}
+				},
+				Terrain: {
+					options: {
+						variant: 'terrain',
+						minZoom: 0,
+						maxZoom: 18
+					}
+				},
+				TerrainBackground: {
+					options: {
+						variant: 'terrain-background',
+						minZoom: 0,
+						maxZoom: 18
+					}
+				},
+				TerrainLabels: {
+					options: {
+						variant: 'terrain-labels',
+						minZoom: 0,
+						maxZoom: 18
+					}
+				},
+				TopOSMRelief: {
+					url: 'https://stamen-tiles-{s}.a.ssl.fastly.net/{variant}/{z}/{x}/{y}.{ext}',
+					options: {
+						variant: 'toposm-color-relief',
+						ext: 'jpg',
+						bounds: [[22, -132], [51, -56]]
+					}
+				},
+				TopOSMFeatures: {
+					options: {
+						variant: 'toposm-features',
+						bounds: [[22, -132], [51, -56]],
+						opacity: 0.9
+					}
+				}
+			}
+		},
+		TomTom: {
+			url: 'https://{s}.api.tomtom.com/map/1/tile/{variant}/{style}/{z}/{x}/{y}.{ext}?key={apikey}',
+			options: {
+				variant: 'basic',
+				maxZoom: 22,
+				attribution:
+					'<a href="https://tomtom.com" target="_blank">&copy;  1992 - ' + new Date().getFullYear() + ' TomTom.</a> ',
+				subdomains: 'abcd',
+				style: 'main',
+				ext: 'png',
+				apikey: '<insert your API key here>',
+			},
+			variants: {
+				Basic: 'basic',
+				Hybrid: 'hybrid',
+				Labels: 'labels'
+			}
+		},
+		Esri: {
+			url: 'https://server.arcgisonline.com/ArcGIS/rest/services/{variant}/MapServer/tile/{z}/{y}/{x}',
+			options: {
+				variant: 'World_Street_Map',
+				attribution: 'Tiles &copy; Esri'
+			},
+			variants: {
+				WorldStreetMap: {
+					options: {
+						attribution:
+							'{attribution.Esri} &mdash; ' +
+							'Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012'
+					}
+				},
+				DeLorme: {
+					options: {
+						variant: 'Specialty/DeLorme_World_Base_Map',
+						minZoom: 1,
+						maxZoom: 11,
+						attribution: '{attribution.Esri} &mdash; Copyright: &copy;2012 DeLorme'
+					}
+				},
+				WorldTopoMap: {
+					options: {
+						variant: 'World_Topo_Map',
+						attribution:
+							'{attribution.Esri} &mdash; ' +
+							'Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community'
+					}
+				},
+				WorldImagery: {
+					options: {
+						variant: 'World_Imagery',
+						attribution:
+							'{attribution.Esri} &mdash; ' +
+							'Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+					}
+				},
+				WorldTerrain: {
+					options: {
+						variant: 'World_Terrain_Base',
+						maxZoom: 13,
+						attribution:
+							'{attribution.Esri} &mdash; ' +
+							'Source: USGS, Esri, TANA, DeLorme, and NPS'
+					}
+				},
+				WorldShadedRelief: {
+					options: {
+						variant: 'World_Shaded_Relief',
+						maxZoom: 13,
+						attribution: '{attribution.Esri} &mdash; Source: Esri'
+					}
+				},
+				WorldPhysical: {
+					options: {
+						variant: 'World_Physical_Map',
+						maxZoom: 8,
+						attribution: '{attribution.Esri} &mdash; Source: US National Park Service'
+					}
+				},
+				OceanBasemap: {
+					options: {
+						variant: 'Ocean_Basemap',
+						maxZoom: 13,
+						attribution: '{attribution.Esri} &mdash; Sources: GEBCO, NOAA, CHS, OSU, UNH, CSUMB, National Geographic, DeLorme, NAVTEQ, and Esri'
+					}
+				},
+				NatGeoWorldMap: {
+					options: {
+						variant: 'NatGeo_World_Map',
+						maxZoom: 16,
+						attribution: '{attribution.Esri} &mdash; National Geographic, Esri, DeLorme, NAVTEQ, UNEP-WCMC, USGS, NASA, ESA, METI, NRCAN, GEBCO, NOAA, iPC'
+					}
+				},
+				WorldGrayCanvas: {
+					options: {
+						variant: 'Canvas/World_Light_Gray_Base',
+						maxZoom: 16,
+						attribution: '{attribution.Esri} &mdash; Esri, DeLorme, NAVTEQ'
+					}
+				}
+			}
+		},
+		OpenWeatherMap: {
+			url: 'http://{s}.tile.openweathermap.org/map/{variant}/{z}/{x}/{y}.png?appid={apiKey}',
+			options: {
+				maxZoom: 19,
+				attribution: 'Map data &copy; <a href="http://openweathermap.org">OpenWeatherMap</a>',
+				apiKey: '<insert your api key here>',
+				opacity: 0.5
+			},
+			variants: {
+				Clouds: 'clouds',
+				CloudsClassic: 'clouds_cls',
+				Precipitation: 'precipitation',
+				PrecipitationClassic: 'precipitation_cls',
+				Rain: 'rain',
+				RainClassic: 'rain_cls',
+				Pressure: 'pressure',
+				PressureContour: 'pressure_cntr',
+				Wind: 'wind',
+				Temperature: 'temp',
+				Snow: 'snow'
+			}
+		},
+		HERE: {
+			/*
+			 * HERE maps, formerly Nokia maps.
+			 * These basemaps are free, but you need an api id and app key. Please sign up at
+			 * https://developer.here.com/plans
+			 */
+			url:
+				'https://{s}.{base}.maps.api.here.com/maptile/2.1/' +
+				'{type}/{mapID}/{variant}/{z}/{x}/{y}/{size}/{format}?' +
+				'app_id={app_id}&app_code={app_code}&lg={language}',
+			options: {
+				attribution:
+					'Map &copy; 1987-' + new Date().getFullYear() + ' <a href="http://developer.here.com">HERE</a>',
+				subdomains: '1234',
+				mapID: 'newest',
+				'app_id': '<insert your app_id here>',
+				'app_code': '<insert your app_code here>',
+				base: 'base',
+				variant: 'normal.day',
+				maxZoom: 20,
+				type: 'maptile',
+				language: 'eng',
+				format: 'png8',
+				size: '256'
+			},
+			variants: {
+				normalDay: 'normal.day',
+				normalDayCustom: 'normal.day.custom',
+				normalDayGrey: 'normal.day.grey',
+				normalDayMobile: 'normal.day.mobile',
+				normalDayGreyMobile: 'normal.day.grey.mobile',
+				normalDayTransit: 'normal.day.transit',
+				normalDayTransitMobile: 'normal.day.transit.mobile',
+				normalDayTraffic: {
+					options: {
+						variant: 'normal.traffic.day',
+						base: 'traffic',
+						type: 'traffictile'
+					}
+				},
+				normalNight: 'normal.night',
+				normalNightMobile: 'normal.night.mobile',
+				normalNightGrey: 'normal.night.grey',
+				normalNightGreyMobile: 'normal.night.grey.mobile',
+				normalNightTransit: 'normal.night.transit',
+				normalNightTransitMobile: 'normal.night.transit.mobile',
+				reducedDay: 'reduced.day',
+				reducedNight: 'reduced.night',
+				basicMap: {
+					options: {
+						type: 'basetile'
+					}
+				},
+				mapLabels: {
+					options: {
+						type: 'labeltile',
+						format: 'png'
+					}
+				},
+				trafficFlow: {
+					options: {
+						base: 'traffic',
+						type: 'flowtile'
+					}
+				},
+				carnavDayGrey: 'carnav.day.grey',
+				hybridDay: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.day'
+					}
+				},
+				hybridDayMobile: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.day.mobile'
+					}
+				},
+				hybridDayTransit: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.day.transit'
+					}
+				},
+				hybridDayGrey: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.grey.day'
+					}
+				},
+				hybridDayTraffic: {
+					options: {
+						variant: 'hybrid.traffic.day',
+						base: 'traffic',
+						type: 'traffictile'
+					}
+				},
+				pedestrianDay: 'pedestrian.day',
+				pedestrianNight: 'pedestrian.night',
+				satelliteDay: {
+					options: {
+						base: 'aerial',
+						variant: 'satellite.day'
+					}
+				},
+				terrainDay: {
+					options: {
+						base: 'aerial',
+						variant: 'terrain.day'
+					}
+				},
+				terrainDayMobile: {
+					options: {
+						base: 'aerial',
+						variant: 'terrain.day.mobile'
+					}
+				}
+			}
+		},
+		HEREv3: {
+			/*
+			 * HERE maps API Version 3.
+			 * These basemaps are free, but you need an API key. Please sign up at
+			 * https://developer.here.com/plans
+			 * Version 3 deprecates the app_id and app_code access in favor of apiKey
+			 *
+			 * Supported access methods as of 2019/12/21:
+			 * @see https://developer.here.com/faqs#access-control-1--how-do-you-control-access-to-here-location-services
+			 */
+			url:
+				'https://{s}.{base}.maps.ls.hereapi.com/maptile/2.1/' +
+				'{type}/{mapID}/{variant}/{z}/{x}/{y}/{size}/{format}?' +
+				'apiKey={apiKey}&lg={language}',
+			options: {
+				attribution:
+					'Map &copy; 1987-' + new Date().getFullYear() + ' <a href="http://developer.here.com">HERE</a>',
+				subdomains: '1234',
+				mapID: 'newest',
+				apiKey: '<insert your apiKey here>',
+				base: 'base',
+				variant: 'normal.day',
+				maxZoom: 20,
+				type: 'maptile',
+				language: 'eng',
+				format: 'png8',
+				size: '256'
+			},
+			variants: {
+				normalDay: 'normal.day',
+				normalDayCustom: 'normal.day.custom',
+				normalDayGrey: 'normal.day.grey',
+				normalDayMobile: 'normal.day.mobile',
+				normalDayGreyMobile: 'normal.day.grey.mobile',
+				normalDayTransit: 'normal.day.transit',
+				normalDayTransitMobile: 'normal.day.transit.mobile',
+				normalNight: 'normal.night',
+				normalNightMobile: 'normal.night.mobile',
+				normalNightGrey: 'normal.night.grey',
+				normalNightGreyMobile: 'normal.night.grey.mobile',
+				normalNightTransit: 'normal.night.transit',
+				normalNightTransitMobile: 'normal.night.transit.mobile',
+				reducedDay: 'reduced.day',
+				reducedNight: 'reduced.night',
+				basicMap: {
+					options: {
+						type: 'basetile'
+					}
+				},
+				mapLabels: {
+					options: {
+						type: 'labeltile',
+						format: 'png'
+					}
+				},
+				trafficFlow: {
+					options: {
+						base: 'traffic',
+						type: 'flowtile'
+					}
+				},
+				carnavDayGrey: 'carnav.day.grey',
+				hybridDay: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.day'
+					}
+				},
+				hybridDayMobile: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.day.mobile'
+					}
+				},
+				hybridDayTransit: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.day.transit'
+					}
+				},
+				hybridDayGrey: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.grey.day'
+					}
+				},
+				pedestrianDay: 'pedestrian.day',
+				pedestrianNight: 'pedestrian.night',
+				satelliteDay: {
+					options: {
+						base: 'aerial',
+						variant: 'satellite.day'
+					}
+				},
+				terrainDay: {
+					options: {
+						base: 'aerial',
+						variant: 'terrain.day'
+					}
+				},
+				terrainDayMobile: {
+					options: {
+						base: 'aerial',
+						variant: 'terrain.day.mobile'
+					}
+				}
+			}
+		},
+		FreeMapSK: {
+			url: 'https://{s}.freemap.sk/T/{z}/{x}/{y}.jpeg',
+			options: {
+				minZoom: 8,
+				maxZoom: 16,
+				subdomains: 'abcd',
+				bounds: [[47.204642, 15.996093], [49.830896, 22.576904]],
+				attribution:
+					'{attribution.OpenStreetMap}, vizualization CC-By-SA 2.0 <a href="http://freemap.sk">Freemap.sk</a>'
+			}
+		},
+		MtbMap: {
+			url: 'http://tile.mtbmap.cz/mtbmap_tiles/{z}/{x}/{y}.png',
+			options: {
+				attribution:
+					'{attribution.OpenStreetMap} &amp; USGS'
+			}
+		},
+		CartoDB: {
+			url: 'https://{s}.basemaps.cartocdn.com/{variant}/{z}/{x}/{y}{r}.png',
+			options: {
+				attribution: '{attribution.OpenStreetMap} &copy; <a href="https://carto.com/attributions">CARTO</a>',
+				subdomains: 'abcd',
+				maxZoom: 20,
+				variant: 'light_all'
+			},
+			variants: {
+				Positron: 'light_all',
+				PositronNoLabels: 'light_nolabels',
+				PositronOnlyLabels: 'light_only_labels',
+				DarkMatter: 'dark_all',
+				DarkMatterNoLabels: 'dark_nolabels',
+				DarkMatterOnlyLabels: 'dark_only_labels',
+				Voyager: 'rastertiles/voyager',
+				VoyagerNoLabels: 'rastertiles/voyager_nolabels',
+				VoyagerOnlyLabels: 'rastertiles/voyager_only_labels',
+				VoyagerLabelsUnder: 'rastertiles/voyager_labels_under'
+			}
+		},
+		HikeBike: {
+			url: 'https://tiles.wmflabs.org/{variant}/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 19,
+				attribution: '{attribution.OpenStreetMap}',
+				variant: 'hikebike'
+			},
+			variants: {
+				HikeBike: {},
+				HillShading: {
+					options: {
+						maxZoom: 15,
+						variant: 'hillshading'
+					}
+				}
+			}
+		},
+		BasemapAT: {
+			url: 'https://maps{s}.wien.gv.at/basemap/{variant}/{type}/google3857/{z}/{y}/{x}.{format}',
+			options: {
+				maxZoom: 19,
+				attribution: 'Datenquelle: <a href="https://www.basemap.at">basemap.at</a>',
+				subdomains: ['', '1', '2', '3', '4'],
+				type: 'normal',
+				format: 'png',
+				bounds: [[46.358770, 8.782379], [49.037872, 17.189532]],
+				variant: 'geolandbasemap'
+			},
+			variants: {
+				basemap: {
+					options: {
+						maxZoom: 20, // currently only in Vienna
+						variant: 'geolandbasemap'
+					}
+				},
+				grau: 'bmapgrau',
+				overlay: 'bmapoverlay',
+				terrain: {
+					options: {
+						variant: 'bmapgelaende',
+						type: 'grau',
+						format: 'jpeg'
+					}
+				},
+				surface: {
+					options: {
+						variant: 'bmapoberflaeche',
+						type: 'grau',
+						format: 'jpeg'
+					}
+				},
+				highdpi: {
+					options: {
+						variant: 'bmaphidpi',
+						format: 'jpeg'
+					}
+				},
+				orthofoto: {
+					options: {
+						maxZoom: 20, // currently only in Vienna
+						variant: 'bmaporthofoto30cm',
+						format: 'jpeg'
+					}
+				}
+			}
+		},
+		nlmaps: {
+			url: 'https://geodata.nationaalgeoregister.nl/tiles/service/wmts/{variant}/EPSG:3857/{z}/{x}/{y}.png',
+			options: {
+				minZoom: 6,
+				maxZoom: 19,
+				bounds: [[50.5, 3.25], [54, 7.6]],
+				attribution: 'Kaartgegevens &copy; <a href="https://www.kadaster.nl">Kadaster</a>'
+			},
+			variants: {
+				'standaard': 'brtachtergrondkaart',
+				'pastel': 'brtachtergrondkaartpastel',
+				'grijs': 'brtachtergrondkaartgrijs',
+				'luchtfoto': {
+					'url': 'https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_ortho25/EPSG:3857/{z}/{x}/{y}.jpeg',
+				}
+			}
+		},
+		NASAGIBS: {
+			url: 'https://map1.vis.earthdata.nasa.gov/wmts-webmerc/{variant}/default/{time}/{tilematrixset}{maxZoom}/{z}/{y}/{x}.{format}',
+			options: {
+				attribution:
+					'Imagery provided by services from the Global Imagery Browse Services (GIBS), operated by the NASA/GSFC/Earth Science Data and Information System ' +
+					'(<a href="https://earthdata.nasa.gov">ESDIS</a>) with funding provided by NASA/HQ.',
+				bounds: [[-85.0511287776, -179.999999975], [85.0511287776, 179.999999975]],
+				minZoom: 1,
+				maxZoom: 9,
+				format: 'jpg',
+				time: '',
+				tilematrixset: 'GoogleMapsCompatible_Level'
+			},
+			variants: {
+				ModisTerraTrueColorCR: 'MODIS_Terra_CorrectedReflectance_TrueColor',
+				ModisTerraBands367CR: 'MODIS_Terra_CorrectedReflectance_Bands367',
+				ViirsEarthAtNight2012: {
+					options: {
+						variant: 'VIIRS_CityLights_2012',
+						maxZoom: 8
+					}
+				},
+				ModisTerraLSTDay: {
+					options: {
+						variant: 'MODIS_Terra_Land_Surface_Temp_Day',
+						format: 'png',
+						maxZoom: 7,
+						opacity: 0.75
+					}
+				},
+				ModisTerraSnowCover: {
+					options: {
+						variant: 'MODIS_Terra_NDSI_Snow_Cover',
+						format: 'png',
+						maxZoom: 8,
+						opacity: 0.75
+					}
+				},
+				ModisTerraAOD: {
+					options: {
+						variant: 'MODIS_Terra_Aerosol',
+						format: 'png',
+						maxZoom: 6,
+						opacity: 0.75
+					}
+				},
+				ModisTerraChlorophyll: {
+					options: {
+						variant: 'MODIS_Terra_Chlorophyll_A',
+						format: 'png',
+						maxZoom: 7,
+						opacity: 0.75
+					}
+				}
+			}
+		},
+		NLS: {
+			// NLS maps are copyright National library of Scotland.
+			// http://maps.nls.uk/projects/api/index.html
+			// Please contact NLS for anything other than non-commercial low volume usage
+			//
+			// Map sources: Ordnance Survey 1:1m to 1:63K, 1920s-1940s
+			//   z0-9  - 1:1m
+			//  z10-11 - quarter inch (1:253440)
+			//  z12-18 - one inch (1:63360)
+			url: 'https://nls-{s}.tileserver.com/nls/{z}/{x}/{y}.jpg',
+			options: {
+				attribution: '<a href="http://geo.nls.uk/maps/">National Library of Scotland Historic Maps</a>',
+				bounds: [[49.6, -12], [61.7, 3]],
+				minZoom: 1,
+				maxZoom: 18,
+				subdomains: '0123',
+			}
+		},
+		JusticeMap: {
+			// Justice Map (http://www.justicemap.org/)
+			// Visualize race and income data for your community, county and country.
+			// Includes tools for data journalists, bloggers and community activists.
+			url: 'https://www.justicemap.org/tile/{size}/{variant}/{z}/{x}/{y}.png',
+			options: {
+				attribution: '<a href="http://www.justicemap.org/terms.php">Justice Map</a>',
+				// one of 'county', 'tract', 'block'
+				size: 'county',
+				// Bounds for USA, including Alaska and Hawaii
+				bounds: [[14, -180], [72, -56]]
+			},
+			variants: {
+				income: 'income',
+				americanIndian: 'indian',
+				asian: 'asian',
+				black: 'black',
+				hispanic: 'hispanic',
+				multi: 'multi',
+				nonWhite: 'nonwhite',
+				white: 'white',
+				plurality: 'plural'
+			}
+		},
+		GeoportailFrance: {
+			url: 'https://wxs.ign.fr/{apikey}/geoportail/wmts?REQUEST=GetTile&SERVICE=WMTS&VERSION=1.0.0&STYLE={style}&TILEMATRIXSET=PM&FORMAT={format}&LAYER={variant}&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
+			options: {
+				attribution: '<a target="_blank" href="https://www.geoportail.gouv.fr/">Geoportail France</a>',
+				bounds: [[-75, -180], [81, 180]],
+				minZoom: 2,
+				maxZoom: 18,
+				// Get your own geoportail apikey here : http://professionnels.ign.fr/ign/contrats/
+				// NB : 'choisirgeoportail' is a demonstration key that comes with no guarantee
+				apikey: 'choisirgeoportail',
+				format: 'image/png',
+				style: 'normal',
+				variant: 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2'
+			},
+			variants: {
+				plan: 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2',
+				parcels: {
+					options: {
+						variant: 'CADASTRALPARCELS.PARCELLAIRE_EXPRESS',
+						style: 'PCI vecteur',
+						maxZoom: 20
+					}
+				},
+				orthos: {
+					options: {
+						maxZoom: 19,
+						format: 'image/jpeg',
+						variant: 'ORTHOIMAGERY.ORTHOPHOTOS'
+					}
+				}
+			}
+		},
+		OneMapSG: {
+			url: 'https://maps-{s}.onemap.sg/v3/{variant}/{z}/{x}/{y}.png',
+			options: {
+				variant: 'Default',
+				minZoom: 11,
+				maxZoom: 18,
+				bounds: [[1.56073, 104.11475], [1.16, 103.502]],
+				attribution: '<img src="https://docs.onemap.sg/maps/images/oneMap64-01.png" style="height:20px;width:20px;"/> New OneMap | Map data &copy; contributors, <a href="http://SLA.gov.sg">Singapore Land Authority</a>'
+			},
+			variants: {
+				Default: 'Default',
+				Night: 'Night',
+				Original: 'Original',
+				Grey: 'Grey',
+				LandLot: 'LandLot'
+			}
+		},
+		USGS: {
+			url: 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}',
+			options: {
+				maxZoom: 20,
+				attribution: 'Tiles courtesy of the <a href="https://usgs.gov/">U.S. Geological Survey</a>'
+			},
+			variants: {
+				USTopo: {},
+				USImagery: {
+					url: 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}'
+				},
+				USImageryTopo: {
+					url: 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}'
+				}
+			}
+		},
+		WaymarkedTrails: {
+			url: 'https://tile.waymarkedtrails.org/{variant}/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 18,
+				attribution: 'Map data: {attribution.OpenStreetMap} | Map style: &copy; <a href="https://waymarkedtrails.org">waymarkedtrails.org</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+			},
+			variants: {
+				hiking: 'hiking',
+				cycling: 'cycling',
+				mtb: 'mtb',
+				slopes: 'slopes',
+				riding: 'riding',
+				skating: 'skating'
+			}
+		},
+		OpenAIP: {
+			url: 'https://{s}.tile.maps.openaip.net/geowebcache/service/tms/1.0.0/openaip_basemap@EPSG%3A900913@png/{z}/{x}/{y}.{ext}',
+			options: {
+				attribution: '<a href="https://www.openaip.net/">openAIP Data</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-NC-SA</a>)',
+				ext: 'png',
+				minZoom: 4,
+				maxZoom: 14,
+				tms: true,
+				detectRetina: true,
+				subdomains: '12'
+			}
+		},
+		OpenSnowMap: {
+			url: 'https://tiles.opensnowmap.org/{variant}/{z}/{x}/{y}.png',
+			options: {
+				minZoom: 9,
+				maxZoom: 18,
+				attribution: 'Map data: {attribution.OpenStreetMap} & ODbL, &copy; <a href="https://www.opensnowmap.org/iframes/data.html">www.opensnowmap.org</a> <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>'
+			},
+			variants: {
+				pistes: 'pistes',
+			}
+		},
+		AzureMaps: {
+			url: 
+				'https://atlas.microsoft.com/map/tile?api-version={apiVersion}'+
+				'&tilesetId={variant}&x={x}&y={y}&zoom={z}&language={language}'+
+				'&subscription-key={subscriptionKey}',
+			options: {
+				attribution: 'See https://docs.microsoft.com/en-US/rest/api/maps/renderv2/getmaptilepreview for details.',
+				apiVersion: '2.0',
+				variant: 'microsoft.imagery',
+				subscriptionKey: '<insert your subscription key here>',
+				language: 'en-US',
+			},
+			variants: {
+				MicrosoftImagery: 'microsoft.imagery',
+				MicrosoftBaseDarkGrey: 'microsoft.base.darkgrey',
+				MicrosoftBaseRoad: 'microsoft.base.road',
+				MicrosoftBaseHybridRoad: 'microsoft.base.hybrid.road',
+				MicrosoftTerraMain: 'microsoft.terra.main',
+				MicrosoftWeatherInfraredMain: {
+					url: 
+					'https://atlas.microsoft.com/map/tile?api-version={apiVersion}'+
+					'&tilesetId={variant}&x={x}&y={y}&zoom={z}'+
+					'&timeStamp={timeStamp}&language={language}' +
+					'&subscription-key={subscriptionKey}',
+					options: {
+						timeStamp: '2021-05-08T09:03:00Z',
+						attribution: 'See https://docs.microsoft.com/en-US/rest/api/maps/renderv2/getmaptilepreview#uri-parameters for details.',
+						variant: 'microsoft.weather.infrared.main',
+					},
+				},
+				MicrosoftWeatherRadarMain: {
+					url: 
+					'https://atlas.microsoft.com/map/tile?api-version={apiVersion}'+
+					'&tilesetId={variant}&x={x}&y={y}&zoom={z}'+
+					'&timeStamp={timeStamp}&language={language}' +
+					'&subscription-key={subscriptionKey}',
+					options: {
+						timeStamp: '2021-05-08T09:03:00Z',
+						attribution: 'See https://docs.microsoft.com/en-US/rest/api/maps/renderv2/getmaptilepreview#uri-parameters for details.',
+						variant: 'microsoft.weather.radar.main',
+					},
+				}
+			},
+		}
+	};
+
+	L.tileLayer.provider = function (provider, options) {
+		return new L.TileLayer.Provider(provider, options);
+	};
+
+	return L;
+}));
+</script>
+<script>LeafletWidget.methods.addProviderTiles = function(provider, layerId, group, options) {
+  this.layerManager.addLayer(L.tileLayer.provider(provider, options), "tile", layerId, group);
+};
+</script>
 
 <style type="text/css">
 code{white-space: pre-wrap;}
@@ -4564,17 +5669,23 @@ overflow-y: auto;
 border: 1px solid #ddd;
 border-radius: 4px;
 }
-.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
-content: "\e259";
+.tabset-dropdown > .nav-tabs > li.active:before {
+content: "";
 font-family: 'Glyphicons Halflings';
 display: inline-block;
 padding: 10px;
 border-right: 1px solid #ddd;
 }
 .tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
-content: "\e258";
-font-family: 'Glyphicons Halflings';
+content: "";
 border: none;
+}
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+content: "";
+font-family: 'Glyphicons Halflings';
+display: inline-block;
+padding: 10px;
+border-right: 1px solid #ddd;
 }
 .tabset-dropdown > .nav-tabs > li.active {
 display: block;
@@ -4627,12 +5738,12 @@ display: none;
 <div id="setup" class="section level2">
 <h2>Setup</h2>
 <p>Read in player data from scraped <code>.csv</code> file.</p>
-<pre class="r"><code>players = read_csv(&quot;players.csv&quot;)
+<pre class="r"><code>players_raw = read_csv(&quot;players.csv&quot;)
 
 
-player_years = sqldf(&quot;SELECT Name, MIN(YEAR) AS FirstYear, MAX(YEAR) AS LastYear FROM players GROUP BY Name&quot;)
+player_years = sqldf(&quot;SELECT Name, MIN(YEAR) AS FirstYear, MAX(YEAR) AS LastYear FROM players_raw GROUP BY Name&quot;)
 
-players = sqldf(&quot;SELECT DISTINCT players.Name, players.Pos, players.Hometown, player_years.FirstYear as FirstYear, player_years.LastYear as LastYear FROM players LEFT JOIN player_years ON players.Name=player_years.Name&quot;)</code></pre>
+players = sqldf(&quot;SELECT DISTINCT players_raw.Name, players_raw.Pos, players_raw.Hometown, player_years.FirstYear as FirstYear, player_years.LastYear as LastYear FROM players_raw LEFT JOIN player_years ON players_raw.Name=player_years.Name&quot;)</code></pre>
 <p>This removed all duplicates, while also keeping for what years those
 players played. However there are still some duplicates because a player
 could have switched positions between seasons. See this in the case of
@@ -4734,6 +5845,10 @@ for (i in 1:length(agg$Name)) {
 players_no_dup = agg %&gt;% 
   mutate(Hometown = towns, FirstYear = firstyears, LastYear = lastyears)
 
+# Individual town adjustment
+players_no_dup$Hometown[players_no_dup$Hometown == &quot;Montreal, Wis.&quot;] = &quot;Montreal, Wisconsin&quot;
+players_no_dup$Hometown[players_no_dup$Hometown == &quot;Howard, Kan.&quot;] = &quot;Howard, Kansas&quot;
+
 players_w_mult_pos = (nrow(players)-nrow(players_no_dup))/nrow(players) * 100
 
 tibble(&quot;Pos. Not Combined&quot; = nrow(players), &quot;Pos. Combined&quot; = nrow(players_no_dup), &quot;% of Multiple Position&quot; = round(players_w_mult_pos, 2)) %&gt;% 
@@ -4795,7 +5910,9 @@ time I ran this <code>.rmd</code> file.</p>
    return (NA)
   }
   for (i in 1:nrow(df)){
-    string = paste(string, df[i,], sep=&quot;\n&quot;)
+    row = df[i,]
+    player = ifelse(row$FirstYear == row$LastYear, glue(&#39;{row$Name}, {row$FirstYear}&#39;), glue(&#39;{row$Name}, {row$FirstYear}-{row$LastYear}&#39;))
+    string = paste(string, player, &quot;&lt;br&gt;&quot;)
   }
   return (string)
 }</code></pre>
@@ -4803,22 +5920,40 @@ time I ran this <code>.rmd</code> file.</p>
 for (town in geocodes$Hometown) {
   town_players = append(town_players, list(players_no_dup[players_no_dup[&quot;Hometown&quot;] == town,]))
   
-  
 }
 
-print_players(players_no_dup[players_no_dup[&quot;Hometown&quot;] == &quot;Madison, Wis.&quot;,])</code></pre>
-<pre><code>## [1] &quot;\nAidan McNamara\nConor Schlichting\nEvan Bondoc\nHenry Houden\nJack Dunn\nJackson Acker\nJake Ferguson\nJoe Ferguson\nJordan Fredrick\nJosh Bernhagen\nKayden Lyles\nMarquis Mason\nMichael  Cerniglia Jr.&quot;
-## [2] &quot;\nlist(\&quot;OL\&quot;)\nlist(\&quot;P\&quot;)\nlist(\&quot;S\&quot;)\nlist(\&quot;WR\&quot;)\nlist(\&quot;WR\&quot;)\nlist(\&quot;RB\&quot;)\nlist(\&quot;TE\&quot;)\nlist(\&quot;S\&quot;)\nlist(\&quot;WR\&quot;)\nlist(\&quot;LS\&quot;)\nlist(c(\&quot;OL\&quot;, \&quot;NT\&quot;))\nlist(\&quot;WR\&quot;)\nlist(\&quot;TE\&quot;)&quot;             
-## [3] &quot;\nMadison, Wis.\nMadison, Wis.\nMadison, Wis.\nMadison, Wis.\nMadison, Wis.\nMadison, Wis.\nMadison, Wis.\nMadison, Wis.\nMadison, Wis.\nMadison, Wis.\nMadison, Wis.\nMadison, Wis.\nMadison, Wis.&quot;        
-## [4] &quot;\n2013\n2018\n2014\n2015\n2016\n2021\n2017\n2013\n2013\n2017\n2017\n2013\n2023&quot;                                                                                                                             
-## [5] &quot;\n2015\n2021\n2018\n2016\n2021\n2023\n2021\n2017\n2015\n2020\n2020\n2013\n2023&quot;</code></pre>
-<pre class="r"><code>geocodes$Players = town_players</code></pre>
+geocodes$Players = town_players</code></pre>
 <pre class="r"><code>m = leaflet() %&gt;% 
-  addTiles() %&gt;% 
-  addMarkers(geocodes$lon, geocodes$lat, popup=geocodes$Hometown)
+  addProviderTiles(provider=providers$Esri.WorldGrayCanvas) %&gt;% 
+  addCircleMarkers(geocodes$lon, geocodes$lat, popup=paste(&quot;&lt;b&gt;&quot;, geocodes$Hometown, &quot;&lt;/b&gt;&lt;br&gt;&quot;, lapply(geocodes$Players, print_players)), label=geocodes$Hometown, radius=4.5, color=&quot;#C5050C&quot;, fillOpacity=1.0, stroke=FALSE)
 m</code></pre>
-<div class="leaflet html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-8e5c00a8c13a3c420d3b" style="width:672px;height:480px;"></div>
-<script type="application/json" data-for="htmlwidget-8e5c00a8c13a3c420d3b">{"x":{"options":{"crs":{"crsClass":"L.CRS.EPSG3857","code":null,"proj4def":null,"projectedBounds":null,"options":{}}},"calls":[{"method":"addTiles","args":["https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",null,null,{"minZoom":0,"maxZoom":18,"tileSize":256,"subdomains":"abc","errorTileUrl":"","tms":false,"noWrap":false,"zoomOffset":0,"zoomReverse":false,"opacity":1,"zIndex":1,"detectRetina":false,"attribution":"&copy; <a href=\"https://openstreetmap.org/copyright/\">OpenStreetMap<\/a>,  <a href=\"https://opendatacommons.org/licenses/odbl/\">ODbL<\/a>"}]},{"method":"addMarkers","args":[[39.7589478,42.9614039,36.3548586,44.0746995,39.1031182,39.7028923,43.0609354,44.1735996,40.4505165,26.1224386,43.0654628,43.0721661,25.9860762,36.548434,42.5847425,36.8516437,41.3455892,26.1669711,37.7159396,26.4614625,42.7755645,43.0389025,26.5317866,39.7561387,41.0025975,42.888627,43.1919373,26.7153424,42.40843,41.8781136,44.9537029,43.2966716,44.2619309,43.0107836,43.0948002,46.1620081,39.6895036,33.7360619,43.333613,38.7521235,43.826381,43.1046143,41.7605849,43.135288,42.7261309,38.5889386,39.9611755,44.3835763,45.1244108,45.1077627,45.2426537,39.843947,42.1275267,42.8294603,43.0057564,42.6055549,39.7494943,44.8872124,42.9261116,41.5628294,44.2388271,47.2528768,42.1539141,45.1385798,43.9680364,43.4147488,39.3762145,43.0972174,40.2911809,43.7508284,39.2689476,42.6830566,42.9405711,44.8908021,39.3600586,44.9530206,43.1788618,43.2233214,40.3553473,44.9211836,44.8546856,42.1662831,30.3321838,-23.5557714,31.6074365,29.1871986,28.8644338,45.5018869,41.7369803,32.9810059,42.6330703,27.9516896,38.8851122,44.3580348,42.9169462,42.9016299,43.7730448,42.5461297,38.9685112,42.4169651,41.6183339,42.9764549,43.3197265,43.0761082,21.3337389,42.7852922,31.4863254,43.1147266,42.3716881,39.9606643,33.748752,42.8858503,33.5185892,28.5383832,44.9591352,44.2722093,44.5133188,27.4989278,33.7879085,32.5896998,43.2159232,43.1683286,43.1633426,44.2022084,44.5235792,-14.2756319,44.4774856,42.4311464,33.1433723,44.5149879,43.0599734,43.2562201,26.1224386,41.8089191,44.5235792,33.4948764,39.8842304,38.9301534,44.4688627,34.1851017,32.7459645,42.1816918,38.9071923,44.8755183,39.1370528,41.571701,25.7616798,41.8775293,42.4500845,39.978371,40.0992294,42.1783584,44.4508079,45.3375,42.6780726,39.0997265,32.8406946,33.3061605,null,39.9242266,39.0839973,40.7359317,43.2052594,30.267153,39.5717796,36.1198588,42.331427,25.9420377,41.6986416,33.4151843,44.4488805,43.3380464,39.7392358,40.6781784,33.8389977,42.2942045,39.6892129,34.0211224,29.7857765,37.8857582,43.313878,29.9988312,43.1836046,42.1261157,45.7763419,42.1608585,42.0853204,42.4733688,40.813616,44.2658204,44.811349,38.9822282,39.2037144,33.8491816,42.9633599,33.7700504,37.7749295,26.007765,41.0814447,40.4406248,43.9632962,40.1573169,37.6871761,44.8554579,34.0549076,42.9835997,32.715738,41.079273,42.6827885,40.735657,42.4029802,38.8338816,22.0964396,44.1858193,42.990831,35.1495343,44.0247062,40.8645306,41.8975977,44.9537029,42.4644795,44.0553908,41.9141945,44.4583321,43.0891787,44.8010763,43.1114407,35.410694,45.0606267,41.7072653,26.1420358,34.4208305,40.8447819,44.7394103,42.0778065,42.0883603,26.5628537,43.1133444,44.8041322,44.6496868,39.8027644,39.8661826,33.8752935,38.624514,40.9167654,26.8396096,32.9412363,37.8206052,34.0356331,21.3098845,42.842256,40.3856246,42.6389216,32.735687,44.7132969,42.6011194,43.0023146,43.1752695,43.2477685,42.5247555,43.4710944,39.5362858,43.1947211,42.9288944,38.6270025,38.2526647,38.5767017,33.4948764,35.4812139,44.2780432,33.5968913,33.0145673,38.9876104,31.549333,33.1031744,41.6661573,42.4972583,39.9205411,32.9090739,36.8507689,39.3995008,33.952602,41.8639201,41.8500284,41.0771914,30.627977,47.6061389,41.143245,-33.8688197,41.5261437,39.1588696,33.3528264,43.7419143,44.977753,43.2869331,41.4517093],[-84.1916069,-88.0125865,-79.6644747,-89.287897,-84.5120196,-75.1118422,-88.1260555,-88.2598276,-80.2444658,-80.1373174,-88.2058043,-89.4007501,-80.3035602,-82.5618186,-87.8211854,-75.9792194,-88.8425769,-80.256595,-121.9101221,-80.0728201,-88.943999,-87.9064736,-80.0905465,-75.0727956,-74.0404175,-88.0384195,-89.4556749,-80.0533746,-71.0536625,-87.6297982,-93.0899578,-87.9875898,-88.4153847,-88.2291729,-88.4031101,-89.2173057,-84.1688274,-118.2922461,-88.2862065,-121.2880059,-88.2462122,-88.3475262,-88.3200715,-87.9356423,-87.7828523,-89.990382,-82.9987942,-89.8173465,-92.6735365,-87.6142737,-89.6789076,-84.1246608,-87.8289548,-88.1586997,-88.3840088,-90.4298502,-89.5317603,-87.8645473,-89.3845634,-83.6538244,-94.9741654,-122.4442906,-88.1361888,-90.3401404,-88.9434476,-84.2305398,-77.154704,-89.5042876,-79.9319942,-87.71453,-84.263826,-90.1176258,-87.9959191,-89.5476204,-84.309939,-92.2912993,-88.1174594,-90.2915132,-80.0494982,-93.4687489,-93.470786,-87.9631308,-81.655651,-46.6395571,-81.8853924,-82.1400923,-80.8544974,-73.5673919,-111.8338359,-80.0325867,-88.6437138,-82.4587527,-76.9158068,-89.0859464,-89.2178937,-88.1492892,-88.4470508,-88.165643,-76.8620327,-88.0739708,-83.3673819,-88.1083897,-87.9534226,-89.1995593,-158.0823892,-88.405096,-82.0170596,-88.4475667,-88.0900815,-75.6054882,-84.3876845,-87.8631362,-86.8103567,-81.3789269,-89.6301221,-88.3389952,-88.0132958,-82.5748194,-117.855281,-96.8570738,-88.0314174,-89.0667775,-87.9645321,-88.4464973,-89.574563,-170.7020359,-88.4506568,-83.4832692,-117.1661449,-88.3303798,-88.4041759,-88.1943651,-80.1373174,-88.0111746,-89.574563,-111.9216734,-82.7535049,-76.8596944,-89.3126138,-83.9251809,-96.9977846,-87.8003437,-77.0368707,-91.9193422,-76.6983022,-87.6944915,-80.1917902,-88.0670118,-73.2453824,-86.1180435,-83.1140771,-87.9978518,-89.2848359,-92.9980556,-88.2762026,-94.5785667,-83.6324022,-111.8412502,null,-83.8088171,-77.1527578,-73.0820556,-96.2950263,-97.7430608,-75.4671423,-80.0736533,-83.0457538,-80.2456045,-88.0683955,-111.8314724,-88.0603806,-89.0153875,-104.990251,-73.9441579,-83.9007382,-83.3099303,-86.5224984,-118.3964665,-95.8245093,-122.1180201,-89.5265093,-95.2621553,-89.2137254,-83.2572332,-92.6827041,-88.0814651,-83.6824384,-83.2218731,-96.7025955,-88.314273,-91.4984941,-94.6707917,-76.8610462,-118.3884078,-85.6680863,-118.1937395,-122.4194155,-80.2962555,-81.5190053,-79.9958864,-91.2562539,-76.3069014,-97.330053,-85.855573,-118.242643,-90.6554041,-117.1610838,-85.1393513,-89.0187222,-74.1723667,-96.3588424,-104.8213634,-159.5261238,-88.462609,-89.5331773,-90.0489801,-88.5426136,-76.5524554,-71.9625736,-93.0899578,-83.3763218,-91.6663523,-88.3086867,-87.5031397,-87.8875848,-90.0792975,-88.4994512,-80.8428504,-92.7916777,-91.6666711,-81.7948103,-119.6981901,-73.8648268,-93.1257723,-87.8223368,-87.9806265,-81.9495331,-87.9000856,-93.1668858,-93.24272,-105.0874842,-74.8390162,-117.5664384,-90.1506465,-74.171811,-80.1019144,-97.1341783,-88.9275695,-118.5155901,-157.8581401,-84.5691487,-79.7589347,-83.2910468,-97.1080656,-93.4227274,-89.6384532,-89.424092,-90.0679016,-89.343727,-83.5363268,-89.7442906,-104.8855322,-88.7289918,-88.8370509,-90.1994042,-85.7584557,-92.1735164,-111.9216734,-80.8578093,-88.2720503,-117.6581562,-97.0969552,-76.8205265,-97.1466695,-96.6705503,-81.339552,-82.9371409,-105.0866504,-96.4500618,-76.2858726,-84.5613355,-84.5499327,-87.8533931,-88.3125738,-73.4686858,-96.3344068,-122.3328481,-81.8552196,151.2092955,-87.8892189,-108.7289882,-111.789027,-90.7792984,-93.2650108,-89.7240116,-82.0354225],null,null,null,{"interactive":true,"draggable":false,"keyboard":true,"title":"","alt":"","zIndexOffset":0,"opacity":1,"riseOnHover":false,"riseOffset":250},["Dayton, Ohio","Greenfield, Wis.","Reidsville, N.C.","Wautoma, Wis.","Cincinnati, Ohio","Glassboro, N.J.","Brookfield, Wis.","Sherwood, Wis.","Imperial, Pa.","Fort Lauderdale, Fla.","Pewaukee, Wis.","Madison, Wis.","Miramar, Fla.","Kingsport, Tenn.","Kenosha, Wis.","Virginia Beach, Va.","Ottawa, Ill.","Sunrise, Fla.","Dublin, Calif.","Delray Beach, Fla.","Milton, Wis.","Milwaukee, Wis.","Boynton Beach, Fla.","Washington Township, N.J.","Hillsdale, N.J.","Franklin, Wis.","Waunakee, Wis.","West Palm Beach, Fla.","Everett, Mass.","Chicago, Ill.","St. Paul, Minn.","Cedarburg, Wis.","Appleton, Wis.","Waukesha, Wis.","Nashotah, Wis.","Land O’ Lakes, Wis.","Kettering, Ohio","San Pedro, Calif.","Slinger, Wis.","Roseville, Calif.","Mount Calvary, Wis.","Hartland, Wis.","Aurora, Ill.","Glendale, Wis.","Racine, Wis.","Fairview Heights, Ill.","Columbus, Ohio","Wisconsin Rapids, Wis.","Somerset, Wis.","Menominee, Mich.","Merrill, Wis.","Huber Heights, Ohio","Northbrook, Ill.","Wind Lake, Wis.","Wales, Wis.","Cuba City, Wis.","Rochester, Ill.","Oconto, Wis.","Oregon, Wis.","Maumee, Ohio","Springfield, Minn.","Tacoma, Wash.","Barrington, Ill.","Medford, Wis.","Berlin, Wis.","Hemlock, Mich.","Mount Airy, Md.","Middleton, Wis.","Jefferson Hills, Pa.","Sheboygan, Wis.","Loveland, Ohio","Darlington, Wis.","Greendale, Wis.","Weston, Wis.","Mason, Ohio","Woodville, Wis.","Menomonee Falls, Wis.","Gotham, Wis.","Mount Lebanon, Pa.","Minnetonka, Minn.","Eden Prairie, Minn.","Buffalo Grove, Ill.","Jacksonville, Fla.","Sao Paulo, Brazil","Jesup, Ga.","Ocala, Fla.","Oak Hill, Fla.","Montreal, Wis.","Logan, Utah","Goose Creek, S.C.","Delavan, Wis.","Tampa, Fla.","Capitol Heights, Md.","Waupaca, Wis.","Stoughton, Wis.","Muskego, Wis.","Fond du Lac, Wis.","Silver Lake, Wis.","Lanham, Md.","Lake Villa, Ill.","Curtice, Ohio","New Berlin, Wis.","Grafton, Wis.","Cottage Grove, Wis.","Kapolei, Hawaii","East Troy, Wis.","Screven, Ga.","Okauchee, Wis.","Round Lake Beach, Ill.","West Chester, Pa.","Atlanta, Ga.","Oak Creek, Wis.","Birmingham, Ala.","Orlando, Fla.","Wausau, Wis.","Kimberly, Wis.","Green Bay, Wis.","Bradenton, Fla.","Orange, Calif.","DeSoto, Texas","Mequon, Wis.","Marshall, Wis.","Brown Deer, Wis.","Menasha, Wis.","Stevens Point, Wis.","Pago Pago, American Samoa","Black Creek, Wis.","Northville, Mich.","San Marcos, Calif.","Seymour, Wis.","Delafield, Wis.","Richfield, Wis.","Fort Lauderdale,                                                                Fla.","Downers Grove, Ill.","Stevens Point,                                                                Wis.","Scottsdale, Ariz.","Pickerington, Ohio","Glenarden, Md.","Amherst Junction, Wis.","Flowery Branch, Ga.","Grand Prairie, Texas","Highland Park, Ill.","Washington, D.C.","Menomonie, Wis.","Severn, Md.","Hazel Crest, Ill.","Miami, Fla.","Glen Ellyn, Ill.","Pittsfield, Mass.","Carmel, Ind.","Dublin, Ohio","Long Grove, Ill.","Amherst, Wis.","Wyoming, Minn.","Burlington, Wis.","Kansas City, Mo.","Macon, Ga.","Chandler, Ariz.","Howard, Kan.","Springfield, Ohio","Rockville, Md.","Sayville, N.Y.","Rock Valley, Iowa","Austin, Texas","Salem, N.J.","Kernersville, N.C.","Detroit, Mich.","Miami Gardens, Fla.","Bolingbrook, Ill.","Mesa, Ariz.","De Pere, Wis.","Columbus, Wis.","Denver, Colo.","Brooklyn, N.Y.","Loganville, Ga.","Inkster, Mich.","Clayton, Ind.","Culver City, Calif.","Katy, Texas","Lafayette, Calif.","Lodi, Wis.","Humble, Texas","Sun Prairie, Wis.","Brownstown, Mich.","Grantsburg, Wis.","Deer Park, Ill.","Milan, Mich.","Southfield, Mich.","Lincoln, Neb.","Combined Locks, Wis.","Eau Claire, Wis.","Overland Park, Kan.","Columbia, Md.","Redondo Beach, Calif.","Grand Rapids, Mich.","Long Beach, Calif.","San Francisco, Calif.","Pembroke Pines, Fla.","Akron, Ohio","Pittsburgh, Pa.","Holmen, Wis.","Lititz, Pa.","Wichita, Kan.","Maple City, Mich.","Los Angeles, Calif.","Fennimore, Wis.","San Diego, Calif.","Fort Wayne, Ind.","Janesville, Wis.","Newark, N.J.","Sergeant Bluff, Iowa","Colorado Springs, Colo.","Kauai, Hawaii","Neenah, Wis.","Verona, Wis.","Memphis, Tenn.","Oshkosh, Wis.","Elysburg, Pa.","Pomfret, Conn.","St. Paul, Minn","Farmington, Mich.","Winona, Minn.","St. Charles, Ill.","Kewaunee, Wis.","Shorewood, Wis.","Stratford, Wis.","Oconomowoc, Wis.","Huntersville, N.C.","Houlton, Wis.","Tiffin, Iowa","Naples, Fla.","Santa Barbara, Calif.","Bronx, N.Y.","Rosemount, Minn.","Glenview, Ill.","Arlington Heights, Ill.","Cape Coral, Fla.","Whitefish Bay, Wis.","Eagan, Minn.","Lakeville, Minn.","Arvada, Colo.","Medford, N.J.","Corona, Calif.","East St. Louis, Ill.","Paterson, N.J.","Palm Beach Gardens, Fla.","Southlake, Texas","Johnston City, Ill.","Pacific Palisades, Calif.","Honolulu, Hawaii","DeWitt, Mich.","Trafford, Pa.","Pontiac, Mich.","Arlington, Texas","Prior Lake, Minn.","Monroe, Wis.","Fitchburg, Wis.","Spring Green, Wis.","DeForest, Wis.","Wixom, Mich.","Baraboo, Wis.","Lone Tree, Colo.","Watertown, Wis.","Fort Atkinson, Wis.","St. Louis, Mo.","Louisville, Ky.","Jefferson City, Mo.","Scottsdale, Ariz","Cornelius, N.C.","Kaukauna, Wis.","Mission Viejo, Calif.","Flower Mound, Texas","Glenn Dale, Md.","Waco, Texas","Allen, Texas","Mentor, Ohio","Roseville, Mich.","Broomfield, Colo.","Rockwall, Texas","Norfolk, Va.","Hamilton, Ohio","Marietta, Ga.","Broadview, Ill.","Batavia, Ill.","Darien, Conn.","College Station, Texas","Seattle, Wash.","Medina, Ohio","Sydney, Australia","Mokena, Ill.","Fruita, Colo.","Gilbert, Ariz.","Cashton, Wis.","Minneapolis, Minn.","Prairie Du Sac, Wis.","Avon, Ohio"],null,null,null,null,{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null]}],"limits":{"lat":[-33.8688197,47.6061389],"lng":[-170.7020359,151.2092955]}},"evals":[],"jsHooks":[]}</script>
+<div class="leaflet html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-56058b0fbf81e97ca35d" style="width:672px;height:480px;"></div>
+<script type="application/json" data-for="htmlwidget-56058b0fbf81e97ca35d">{"x":{"options":{"crs":{"crsClass":"L.CRS.EPSG3857","code":null,"proj4def":null,"projectedBounds":null,"options":{}}},"calls":[{"method":"addProviderTiles","args":["Esri.WorldGrayCanvas",null,null,{"errorTileUrl":"","noWrap":false,"detectRetina":false}]},{"method":"addCircleMarkers","args":[[39.7589478,42.9614039,36.3548586,44.0746995,39.1031182,39.70289229999999,43.0609354,44.1735996,40.4505165,26.1224386,43.0654628,43.0721661,25.9860762,36.548434,42.5847425,36.8516437,41.3455892,26.1669711,37.7159396,26.4614625,42.7755645,43.0389025,26.5317866,39.7561387,41.0025975,42.888627,43.1919373,26.7153424,42.40843,41.8781136,44.9537029,43.2966716,44.2619309,43.0107836,43.09480019999999,46.1620081,39.68950359999999,33.7360619,43.333613,38.7521235,43.826381,43.1046143,41.7605849,43.135288,42.7261309,38.5889386,39.9611755,44.38357630000001,45.1244108,45.10776269999999,45.24265370000001,39.843947,42.1275267,42.8294603,43.0057564,42.6055549,39.7494943,44.8872124,42.9261116,41.5628294,44.23882709999999,47.2528768,42.1539141,45.1385798,43.9680364,43.4147488,39.3762145,43.09721740000001,40.2911809,43.7508284,39.2689476,42.6830566,42.9405711,44.89080209999999,39.3600586,44.95302059999999,43.1788618,43.2233214,40.3553473,44.9211836,44.8546856,42.1662831,30.3321838,-23.5557714,31.6074365,29.1871986,28.8644338,46.42800330000001,41.7369803,32.9810059,42.6330703,27.9516896,38.8851122,44.3580348,42.91694620000001,42.9016299,43.7730448,42.5461297,38.96851119999999,42.4169651,41.6183339,42.9764549,43.3197265,43.0761082,21.3337389,42.7852922,31.48632539999999,43.1147266,42.37168810000001,39.9606643,33.748752,42.8858503,33.5185892,28.5383832,44.9591352,44.2722093,44.5133188,27.4989278,33.7879085,32.5896998,43.2159232,43.1683286,43.1633426,44.2022084,44.52357920000001,-14.2756319,44.4774856,42.4311464,33.1433723,44.5149879,43.0599734,43.2562201,26.1224386,41.8089191,44.52357920000001,33.4948764,39.8842304,38.93015339999999,44.4688627,34.1851017,32.7459645,42.1816918,38.9071923,44.8755183,39.1370528,41.571701,25.7616798,41.8775293,42.4500845,39.978371,40.0992294,42.1783584,44.4508079,45.3375,42.6780726,39.0997265,32.8406946,33.3061605,37.4703117,39.9242266,39.0839973,40.73593169999999,43.2052594,30.267153,39.5717796,36.1198588,42.331427,25.9420377,41.69864159999999,33.4151843,44.4488805,43.3380464,39.7392358,40.6781784,33.8389977,42.2942045,39.6892129,34.0211224,29.7857765,37.8857582,43.313878,29.99883119999999,43.1836046,42.1261157,45.7763419,42.1608585,42.0853204,42.4733688,40.813616,44.2658204,44.811349,38.9822282,39.2037144,33.8491816,42.9633599,33.7700504,37.7749295,26.007765,41.0814447,40.44062479999999,43.96329619999999,40.1573169,37.68717609999999,44.8554579,34.0549076,42.98359970000001,32.715738,41.079273,42.6827885,40.735657,42.40298019999999,38.8338816,22.0964396,44.1858193,42.990831,35.1495343,44.0247062,40.86453059999999,41.8975977,44.9537029,42.4644795,44.0553908,41.9141945,44.4583321,43.0891787,44.8010763,43.1114407,35.410694,45.0606267,41.7072653,26.1420358,34.4208305,40.8447819,44.7394103,42.0778065,42.0883603,26.5628537,43.1133444,44.8041322,44.6496868,39.8027644,39.86618259999999,33.8752935,38.624514,40.9167654,26.8396096,32.9412363,37.8206052,34.03563310000001,21.3098845,42.842256,40.3856246,42.6389216,32.735687,44.7132969,42.60111939999999,43.0023146,43.1752695,43.2477685,42.5247555,43.4710944,39.5362858,43.1947211,42.9288944,38.6270025,38.2526647,38.57670170000001,33.4948764,35.4812139,44.2780432,33.5968913,33.0145673,38.98761040000001,31.549333,33.1031744,41.6661573,42.4972583,39.9205411,32.9090739,36.8507689,39.3995008,33.95260200000001,41.8639201,41.8500284,41.0771914,30.627977,47.6061389,41.143245,-33.8688197,41.5261437,39.1588696,33.3528264,43.7419143,44.977753,43.2869331,41.4517093],[-84.1916069,-88.0125865,-79.6644747,-89.287897,-84.5120196,-75.1118422,-88.12605549999999,-88.25982759999999,-80.2444658,-80.13731740000001,-88.2058043,-89.4007501,-80.30356019999999,-82.5618186,-87.82118539999999,-75.97921939999999,-88.8425769,-80.25659499999999,-121.9101221,-80.0728201,-88.94399899999999,-87.9064736,-80.0905465,-75.07279559999999,-74.0404175,-88.03841949999999,-89.45567489999999,-80.0533746,-71.0536625,-87.6297982,-93.08995779999999,-87.98758979999999,-88.41538469999999,-88.22917289999999,-88.40311009999999,-89.2173057,-84.1688274,-118.2922461,-88.28620649999999,-121.2880059,-88.2462122,-88.3475262,-88.32007150000001,-87.9356423,-87.78285230000002,-89.990382,-82.99879419999999,-89.8173465,-92.6735365,-87.6142737,-89.6789076,-84.12466080000002,-87.82895479999999,-88.1586997,-88.38400879999999,-90.4298502,-89.53176030000002,-87.8645473,-89.38456339999999,-83.65382439999999,-94.9741654,-122.4442906,-88.1361888,-90.3401404,-88.9434476,-84.2305398,-77.154704,-89.5042876,-79.93199419999999,-87.71453,-84.26382600000001,-90.1176258,-87.99591909999999,-89.5476204,-84.309939,-92.29129930000001,-88.1174594,-90.2915132,-80.0494982,-93.46874889999999,-93.470786,-87.9631308,-81.65565099999999,-46.6395571,-81.8853924,-82.14009229999999,-80.8544974,-90.2460097,-111.8338359,-80.03258670000001,-88.6437138,-82.45875269999999,-76.9158068,-89.0859464,-89.21789369999999,-88.1492892,-88.4470508,-88.165643,-76.8620327,-88.0739708,-83.3673819,-88.10838969999999,-87.9534226,-89.19955929999999,-158.0823892,-88.40509600000001,-82.0170596,-88.4475667,-88.0900815,-75.6054882,-84.38768449999999,-87.8631362,-86.8103567,-81.3789269,-89.63012209999999,-88.3389952,-88.01329579999999,-82.5748194,-117.855281,-96.85707379999999,-88.0314174,-89.0667775,-87.9645321,-88.44649729999999,-89.574563,-170.7020359,-88.45065679999999,-83.4832692,-117.1661449,-88.3303798,-88.4041759,-88.1943651,-80.13731740000001,-88.01117459999999,-89.574563,-111.9216734,-82.7535049,-76.8596944,-89.31261380000001,-83.9251809,-96.9977846,-87.8003437,-77.03687069999999,-91.9193422,-76.6983022,-87.6944915,-80.1917902,-88.0670118,-73.2453824,-86.1180435,-83.1140771,-87.99785179999999,-89.28483589999999,-92.9980556,-88.27620259999999,-94.5785667,-83.6324022,-111.8412502,-96.2636066,-83.8088171,-77.1527578,-73.08205559999999,-96.2950263,-97.74306079999999,-75.46714229999999,-80.07365329999999,-83.0457538,-80.2456045,-88.06839549999999,-111.8314724,-88.0603806,-89.0153875,-104.990251,-73.94415789999999,-83.90073819999999,-83.30993029999999,-86.52249839999999,-118.3964665,-95.8245093,-122.1180201,-89.5265093,-95.2621553,-89.2137254,-83.2572332,-92.6827041,-88.0814651,-83.6824384,-83.2218731,-96.7025955,-88.314273,-91.4984941,-94.6707917,-76.86104619999999,-118.3884078,-85.6680863,-118.1937395,-122.4194155,-80.2962555,-81.51900529999999,-79.9958864,-91.2562539,-76.3069014,-97.33005300000001,-85.85557299999999,-118.242643,-90.6554041,-117.1610838,-85.1393513,-89.0187222,-74.1723667,-96.3588424,-104.8213634,-159.5261238,-88.462609,-89.53317729999999,-90.04898009999999,-88.5426136,-76.5524554,-71.9625736,-93.08995779999999,-83.37632180000001,-91.6663523,-88.3086867,-87.50313969999999,-87.8875848,-90.0792975,-88.4994512,-80.84285040000002,-92.79167769999999,-91.6666711,-81.79481029999999,-119.6981901,-73.8648268,-93.12577229999999,-87.8223368,-87.98062650000001,-81.9495331,-87.9000856,-93.1668858,-93.24272000000001,-105.0874842,-74.8390162,-117.5664384,-90.15064649999999,-74.17181099999999,-80.1019144,-97.1341783,-88.9275695,-118.5155901,-157.8581401,-84.56914870000001,-79.7589347,-83.29104679999999,-97.1080656,-93.4227274,-89.6384532,-89.424092,-90.0679016,-89.343727,-83.5363268,-89.74429060000001,-104.8855322,-88.7289918,-88.83705089999999,-90.1994042,-85.7584557,-92.1735164,-111.9216734,-80.8578093,-88.27205029999999,-117.6581562,-97.0969552,-76.8205265,-97.1466695,-96.67055030000002,-81.339552,-82.9371409,-105.0866504,-96.4500618,-76.28587259999999,-84.5613355,-84.5499327,-87.85339309999999,-88.3125738,-73.4686858,-96.3344068,-122.3328481,-81.8552196,151.2092955,-87.8892189,-108.7289882,-111.789027,-90.7792984,-93.2650108,-89.7240116,-82.03542250000001],4.5,null,null,{"interactive":true,"className":"","stroke":false,"color":"#C5050C","weight":5,"opacity":0.5,"fill":true,"fillColor":"#C5050C","fillOpacity":1},null,null,["<b> Dayton, Ohio <\/b><br>  A.J. Jordan, 2013-2015 <br> Kraig Howe, 2015-2018 <br> Markus Allen, 2021 <br>","<b> Greenfield, Wis. <\/b><br>  Joel Stave, 2013-2015 <br>","<b> Reidsville, N.C. <\/b><br>  Kenzel Doe, 2013-2014 <br>","<b> Wautoma, Wis. <\/b><br>  Jared Abbrederis, 2013 <br>","<b> Cincinnati, Ohio <\/b><br>  Chase Wolf, 2018-2022 <br> Darius Hillary, 2013-2015 <br> James Thompson Jr., 2020-2023 <br> Jeff Duckworth, 2013 <br> Jesse Hayes, 2013-2015 <br>","<b> Glassboro, N.J. <\/b><br>  Corey Clement, 2013-2016 <br>","<b> Brookfield, Wis. <\/b><br>  Alec James, 2013-2017 <br> Bryce Gilbert, 2013 <br> Chikwe Obasih, 2013-2017 <br> Jeffrey Lewis, 2013 <br>","<b> Sherwood, Wis. <\/b><br>  Brett Arnold, 2013 <br>","<b> Imperial, Pa. <\/b><br>  Michael Caputo, 2013-2015 <br>","<b> Fort Lauderdale, Fla. <\/b><br>  Derrick Tindal, 2014-2017 <br> Hugs Etienne, 2013 <br> James White, 2013 <br> James Williams, 2019 <br> Sojourn Shelton, 2013-2016 <br>","<b> Pewaukee, Wis. <\/b><br>  Derek Watt, 2013-2015 <br> T.J. Watt, 2013-2016 <br>","<b> Madison, Wis. <\/b><br>  Aidan McNamara, 2013-2015 <br> Conor Schlichting, 2018-2021 <br> Evan Bondoc, 2014-2018 <br> Henry Houden, 2015-2016 <br> Jack Dunn, 2016-2021 <br> Jackson Acker, 2021-2023 <br> Jake Ferguson, 2017-2021 <br> Joe Ferguson, 2013-2017 <br> Jordan Fredrick, 2013-2015 <br> Josh Bernhagen, 2017-2020 <br> Kayden Lyles, 2017-2020 <br> Marquis Mason, 2013 <br> Michael  Cerniglia Jr., 2023 <br>","<b> Miramar, Fla. <\/b><br>  Devin Gaulden, 2013-2014 <br> George Rushing, 2014-2017 <br>","<b> Kingsport, Tenn. <\/b><br>  Curt Phillips, 2013 <br>","<b> Kenosha, Wis. <\/b><br>  Andrew Lyons, 2018-2019 <br> Jazz Peavy, 2013-2017 <br> Melvin Gordon, 2013-2014 <br> Vonte Jackson, 2013 <br>","<b> Virginia Beach, Va. <\/b><br>  T.J. Reynard, 2013-2015 <br>","<b> Ottawa, Ill. <\/b><br>  Ethan Armstrong, 2013 <br> Thad Armstrong, 2013-2015 <br>","<b> Sunrise, Fla. <\/b><br>  Dezmen Southward, 2013 <br>","<b> Dublin, Calif. <\/b><br>  Bart Houston, 2013-2016 <br>","<b> Delray Beach, Fla. <\/b><br>  Conor O’Neill, 2013 <br>","<b> Milton, Wis. <\/b><br>  Nate Hammon, 2013 <br>","<b> Milwaukee, Wis. <\/b><br>  Amaun Williams, 2020-2022 <br> Angel Toombs, 2023 <br> Connor Senger, 2013-2014 <br> Conor Sheehy, 2014-2017 <br> Dare Ogunbowale, 2013-2016 <br> Nate White, 2023 <br> Riley Nowakowski, 2020-2023 <br> Tommy Brunner, 2021-2023 <br>","<b> Boynton Beach, Fla. <\/b><br>  Reggie Love, 2013-2016 <br> Terrance Floyd, 2013-2015 <br>","<b> Washington Township, N.J. <\/b><br>  Sherard Cadogan, 2013-2014 <br>","<b> Hillsdale, N.J. <\/b><br>  Tanner McEvoy, 2013-2015 <br>","<b> Franklin, Wis. <\/b><br>  Kobe Knaak, 2017-2020 <br> Lance Baretz, 2013-2014 <br> Myles Burkett, 2022-2023 <br>","<b> Waunakee, Wis. <\/b><br>  Austin Maly, 2013-2014 <br> Blake Smithback, 2017-2021 <br> Derek Straus, 2013-2015 <br> Jack Russell, 2013-2015 <br> Leo Musso, 2013-2016 <br> Nate Carter, 2018 <br> Troy Laufenberg, 2015-2016 <br> Tyler Mais, 2017-2021 <br>","<b> West Palm Beach, Fla. <\/b><br>  Peniel Jean, 2013-2014 <br>","<b> Everett, Mass. <\/b><br>  Jakarrie Washington, 2013 <br> Jason Maitre, 2023 <br> Lubern Figaro, 2014-2017 <br>","<b> Chicago, Ill. <\/b><br>  Chris James, 2016-2018 <br> Jamel Howard, 2023 <br> James Adeyanju, 2013-2014 <br> Jerry Ponio, 2013 <br> Will Pauling, 2023 <br>","<b> St. Paul, Minn. <\/b><br>  Connor Udelhoven, 2013-2016 <br> James McGuire, 2013-2014 <br> Keelon Brookins, 2013-2016 <br>","<b> Cedarburg, Wis. <\/b><br>  Matt Johnson, 2013 <br>","<b> Appleton, Wis. <\/b><br>  Chris Gill, 2013 <br> Kyle Zuleger, 2013 <br>","<b> Waukesha, Wis. <\/b><br>  Chimere Dike, 2020-2023 <br> Cole Dakovich, 2020-2023 <br> Joe Schobert, 2013-2015 <br> Kevin MacCudden, 2013 <br> Matt Hubley, 2013 <br>","<b> Nashotah, Wis. <\/b><br>  Derek Landisch, 2013-2014 <br>","<b> Land O’ Lakes, Wis. <\/b><br>  Austin Ramesh, 2013-2017 <br>","<b> Kettering, Ohio <\/b><br>  Chris Borland, 2013 <br> Connor Cummins, 2013-2014 <br>","<b> San Pedro, Calif. <\/b><br>  Leon Jacobs, 2013-2017 <br>","<b> Slinger, Wis. <\/b><br>  Aaron Maternowski, 2016 <br> D.J. Spurling, 2013-2014 <br> Tyler Dippel, 2013 <br>","<b> Roseville, Calif. <\/b><br>  Andrew Endicott, 2013-2016 <br>","<b> Mount Calvary, Wis. <\/b><br>  Eric Steffes, 2013-2016 <br>","<b> Hartland, Wis. <\/b><br>  Blake Mielke, 2016-2017 <br> Brady Kelliher, 2013-2014 <br> Charlie Jarvis, 2022-2023 <br> Drew Meyer, 2013-2015 <br> George Panos, 2014-2015 <br> Ricky Finco, 2015-2016 <br>","<b> Aurora, Ill. <\/b><br>  Troy Fumagalli, 2013-2017 <br>","<b> Glendale, Wis. <\/b><br>  Alex Walker, 2013 <br>","<b> Racine, Wis. <\/b><br>  Davion Thomas-Kumpula, 2023 <br> Kelly Thomas, 2015-2016 <br> Marcus Trotter, 2013-2014 <br> Michael Trotter, 2013-2014 <br>","<b> Fairview Heights, Ill. <\/b><br>  Warren Herring, 2013-2014 <br>","<b> Columbus, Ohio <\/b><br>  Austin Traylor, 2013-2015 <br> Isaiah Mullens, 2018-2023 <br> Jack Pugh, 2021-2023 <br> Manny Mullens, 2023 <br> Ray Ball, 2013-2015 <br> Robert Wheelwright, 2013-2016 <br> Rodas Johnson, 2019-2023 <br>","<b> Wisconsin Rapids, Wis. <\/b><br>  Hayden Biegel, 2013-2015 <br> Vince Biegel, 2013-2016 <br>","<b> Somerset, Wis. <\/b><br>  Jack Cichy, 2013-2017 <br> Max Praschak, 2015-2016 <br>","<b> Menominee, Mich. <\/b><br>  Jacob Pedersen, 2013 <br>","<b> Merrill, Wis. <\/b><br>  Jake Collinsworth, 2017-2018 <br> Sam Arneson, 2013-2014 <br>","<b> Huber Heights, Ohio <\/b><br>  Josh Harrison, 2013-2014 <br>","<b> Northbrook, Ill. <\/b><br>  Carl Miller, 2013 <br>","<b> Wind Lake, Wis. <\/b><br>  Kyle Costigan, 2013-2014 <br>","<b> Wales, Wis. <\/b><br>  Blake Wilcox, 2019 <br> Jake Rademacher, 2013 <br>","<b> Cuba City, Wis. <\/b><br>  Trent Denlinger, 2013-2014 <br>","<b> Rochester, Ill. <\/b><br>  Garret Dooley, 2013-2017 <br>","<b> Oconto, Wis. <\/b><br>  Ben Ruechel, 2013-2014 <br>","<b> Oregon, Wis. <\/b><br>  Jacob Ninneman, 2013 <br>","<b> Maumee, Ohio <\/b><br>  Matt Miller, 2013 <br>","<b> Springfield, Minn. <\/b><br>  Tyler Marz, 2013-2015 <br>","<b> Tacoma, Wash. <\/b><br>  Walker Williams, 2013-2015 <br>","<b> Barrington, Ill. <\/b><br>  Dan Voltz, 2013-2015 <br> Jackson Keeler, 2013 <br>","<b> Medford, Wis. <\/b><br>  Ben Hemer, 2013-2015 <br> Ethan Hemer, 2013 <br>","<b> Berlin, Wis. <\/b><br>  Dallas Lewallen, 2013-2014 <br>","<b> Hemlock, Mich. <\/b><br>  Zac Matthias, 2013 <br>","<b> Mount Airy, Md. <\/b><br>  Rob Havenstein, 2013-2014 <br>","<b> Middleton, Wis. <\/b><br>  Bryce Carey, 2022-2023 <br> Cole Toennies, 2022 <br> Mitchell Herl, 2015-2016 <br> Ryan Groy, 2013 <br>","<b> Jefferson Hills, Pa. <\/b><br>  Brock DeCicco, 2013 <br> Jordan Mayer, 2023 <br>","<b> Sheboygan, Wis. <\/b><br>  Jake Stengel, 2013-2014 <br>","<b> Loveland, Ohio <\/b><br>  Brian Wozniak, 2013 <br>","<b> Darlington, Wis. <\/b><br>  Alex Erickson, 2013-2015 <br> Hunter Johnson, 2017-2019 <br>","<b> Greendale, Wis. <\/b><br>  Brett Nethery, 2013 <br> Jacob Maxwell, 2014-2016 <br>","<b> Weston, Wis. <\/b><br>  Konrad Zagzebski, 2013-2014 <br>","<b> Mason, Ohio <\/b><br>  Pat Muldoon, 2013 <br>","<b> Woodville, Wis. <\/b><br>  Jake Keefer, 2013-2015 <br>","<b> Menomonee Falls, Wis. <\/b><br>  Jackson Kollath, 2019 <br> Julius Davis, 2019-2022 <br> Kyle French, 2013 <br> Matt Henningsen, 2017-2021 <br>","<b> Gotham, Wis. <\/b><br>  Logan Schmidt, 2013-2015 <br>","<b> Mount Lebanon, Pa. <\/b><br>  Arthur Goldberg, 2013-2015 <br>","<b> Minnetonka, Minn. <\/b><br>  Beau Allen, 2013 <br> Lee Hutton, 2022 <br>","<b> Eden Prairie, Minn. <\/b><br>  Brendan Kelly, 2013 <br> Ryan Connelly, 2014-2018 <br>","<b> Buffalo Grove, Ill. <\/b><br>  Maema Njongmeta, 2019-2023 <br> Stephen Salata, 2013 <br>","<b> Jacksonville, Fla. <\/b><br>  D.J. Gillins, 2014-2015 <br> Quincy Burroughs, 2023 <br>","<b> Sao Paulo, Brazil <\/b><br>  Rafael Gaglianone, 2014-2018 <br>","<b> Jesup, Ga. <\/b><br>  Krenwick Sanders, 2014-2015 <br>","<b> Ocala, Fla. <\/b><br>  Natrell Jamerson, 2014-2017 <br>","<b> Oak Hill, Fla. <\/b><br>  D'Cota Dixon, 2014-2018 <br>","<b> Montreal, Wisconsin <\/b><br>  Mark Saari, 2014-2018 <br>","<b> Logan, Utah <\/b><br>  Chasen Andersen, 2014 <br>","<b> Goose Creek, S.C. <\/b><br>  Caleb Kinlaw, 2014-2015 <br>","<b> Delavan, Wis. <\/b><br>  Daniel Supernaw, 2014 <br> Ethan Cesarz, 2017-2018 <br> John Damrow, 2014-2015 <br> Ross Gengler, 2020-2023 <br>","<b> Tampa, Fla. <\/b><br>  Austin Hudson, 2014 <br> Keldric Preston, 2016-2017 <br>","<b> Capitol Heights, Md. <\/b><br>  Taiwan Deal, 2014-2018 <br>","<b> Waupaca, Wis. <\/b><br>  Zander Neuville, 2014-2018 <br>","<b> Stoughton, Wis. <\/b><br>  Adam Krumholz, 2016-2020 <br> Barrett Nelson, 2022-2023 <br> Brady Schipper, 2018-2022 <br> Jack Nelson, 2020-2023 <br> Jordan DiBenedetto, 2019-2022 <br> P.J. Rosowski, 2014-2018 <br>","<b> Muskego, Wis. <\/b><br>  C.J. Goetz, 2018-2023 <br> Hunter Wohler, 2021-2023 <br> Peter Roy, 2014-2017 <br>","<b> Fond du Lac, Wis. <\/b><br>  Braelon Allen, 2021-2023 <br> Matt Austin, 2014 <br> Zach Hintze, 2015-2019 <br>","<b> Silver Lake, Wis. <\/b><br>  Justin Schweitzer, 2014 <br>","<b> Lanham, Md. <\/b><br>  Ashfott Fonjungo, 2014 <br>","<b> Lake Villa, Ill. <\/b><br>  T.J. Edwards, 2014-2018 <br>","<b> Curtice, Ohio <\/b><br>  Michael Deiter, 2014-2018 <br>","<b> New Berlin, Wis. <\/b><br>  Brett Connors, 2014-2017 <br> Connor Allen, 2015-2019 <br> Nicholas Holicek, 2014 <br>","<b> Grafton, Wis. <\/b><br>  Beau Benzschawel, 2014-2018 <br> JP Benzschawel, 2021-2023 <br> Luke Benzschawel, 2016-2019 <br> Michael Balistreri, 2017-2021 <br> Tyler Beach, 2017-2022 <br>","<b> Cottage Grove, Wis. <\/b><br>  Jaden Gault, 2014 <br>","<b> Kapolei, Hawaii <\/b><br>  Micah Kapoi, 2014-2018 <br>","<b> East Troy, Wis. <\/b><br>  Sam Eckert, 2014 <br>","<b> Screven, Ga. <\/b><br>  Jeremy Patterson, 2014-2016 <br>","<b> Okauchee, Wis. <\/b><br>  Billy Hirschfeld, 2014-2017 <br>","<b> Round Lake Beach, Ill. <\/b><br>  Titus Booker, 2015-2016 <br>","<b> West Chester, Pa. <\/b><br>  Alex Hornibrook, 2015-2018 <br>","<b> Atlanta, Ga. <\/b><br>  Arrington Farrar, 2015-2017 <br>","<b> Oak Creek, Wis. <\/b><br>  Elijah Strong, 2015 <br>","<b> Birmingham, Ala. <\/b><br>  Bradrick Shaw, 2015-2019 <br> Christian Bell, 2016-2019 <br>","<b> Orlando, Fla. <\/b><br>  Serge Trezy, 2015-2016 <br>","<b> Wausau, Wis. <\/b><br>  Chris Clementi, 2017 <br> Jake Whalen, 2015-2017 <br>","<b> Kimberly, Wis. <\/b><br>  Bret Verstegen, 2015-2016 <br> Danny Vanden Boom, 2017-2021 <br> Logan Bruss, 2017-2021 <br>","<b> Green Bay, Wis. <\/b><br>  Alec Ingold, 2015-2018 <br> Cole Van Lanen, 2016-2020 <br> Coy Wanner, 2017-2019 <br> Gabe Lloyd, 2016-2020 <br> Kerry Kodanko, 2020-2023 <br> Mike Gregoire, 2018-2022 <br>","<b> Bradenton, Fla. <\/b><br>  Nick Thomas, 2015-2017 <br>","<b> Orange, Calif. <\/b><br>  Kyle Penniston, 2015-2018 <br>","<b> DeSoto, Texas <\/b><br>  Chris Orr, 2015-2019 <br>","<b> Mequon, Wis. <\/b><br>  Ayo Adebogun, 2021 <br> David Pfaff, 2015-2019 <br> Jack Popp, 2016 <br>","<b> Marshall, Wis. <\/b><br>  Collin Larsh, 2017-2021 <br> Ty DeForest, 2015 <br>","<b> Brown Deer, Wis. <\/b><br>  Zack Baun, 2015-2019 <br>","<b> Menasha, Wis. <\/b><br>  Evan Van Dyn Hoven, 2023 <br> Tyler Johnson, 2015-2019 <br>","<b> Stevens Point, Wis. <\/b><br>  Ryan Ramczyk, 2015-2016 <br>","<b> Pago Pago, American Samoa <\/b><br>  Olive Sagapolu, 2015-2018 <br>","<b> Black Creek, Wis. <\/b><br>  Jon Dietzen, 2015-2020 <br>","<b> Northville, Mich. <\/b><br>  A.J. Abbott, 2018-2021 <br> David Moorman, 2015-2019 <br>","<b> San Marcos, Calif. <\/b><br>  Kevin Estes, 2015-2016 <br>","<b> Seymour, Wis. <\/b><br>  Gunnar Roberge, 2015-2019 <br>","<b> Delafield, Wis. <\/b><br>  Ian Dretzka, 2015-2016 <br> Owen Arnett, 2021-2023 <br> Sam DeLany, 2017 <br>","<b> Richfield, Wis. <\/b><br>  Jason Erdmann, 2015-2019 <br>","<b> Fort Lauderdale,                                                                Fla. <\/b><br>  Andrew James, 2015 <br>","<b> Downers Grove, Ill. <\/b><br>  David Edwards, 2015-2018 <br> Jack Eschenbach, 2018-2022 <br>","<b> Stevens Point,                                                                Wis. <\/b><br>  Andrew Ruzek, 2015 <br>","<b> Scottsdale, Ariz. <\/b><br>  Karé Lyles, 2016-2017 <br>","<b> Pickerington, Ohio <\/b><br>  Seth Currens, 2016-2019 <br>","<b> Glenarden, Md. <\/b><br>  Nick Nelson, 2016-2017 <br>","<b> Amherst Junction, Wis. <\/b><br>  Garrett Groshek, 2016-2020 <br>","<b> Flowery Branch, Ga. <\/b><br>  Anthony Lotti, 2016-2019 <br>","<b> Grand Prairie, Texas <\/b><br>  Caesar Williams, 2016-2021 <br> Emmet Perry, 2017-2019 <br>","<b> Highland Park, Ill. <\/b><br>  Cristian Volpentesta, 2016-2019 <br>","<b> Washington, D.C. <\/b><br>  Patrick Johnson, 2016-2017 <br>","<b> Menomonie, Wis. <\/b><br>  Alex Fenton, 2017-2018 <br> Mason Platter, 2018 <br> Mason Stokke, 2016-2020 <br>","<b> Severn, Md. <\/b><br>  Eric Burrell, 2016-2020 <br>","<b> Hazel Crest, Ill. <\/b><br>  Kendric Pryor, 2016-2021 <br>","<b> Miami, Fla. <\/b><br>  Dontye Carriere-Williams, 2016-2017 <br> Faion Hicks, 2017-2021 <br> Rachad Wildgoose, 2018-2020 <br> Ricardo Hallman, 2021-2023 <br>","<b> Glen Ellyn, Ill. <\/b><br>  Sam Brodner, 2016-2017 <br>","<b> Pittsfield, Mass. <\/b><br>  Jake Hescock, 2016 <br>","<b> Carmel, Ind. <\/b><br>  Noah Burks, 2016-2021 <br>","<b> Dublin, Ohio <\/b><br>  Griffin Grady, 2016-2018 <br> Joe Huber, 2023 <br>","<b> Long Grove, Ill. <\/b><br>  Mike Maskalunas, 2016-2021 <br>","<b> Amherst, Wis. <\/b><br>  Tyler Biadasz, 2016-2019 <br>","<b> Wyoming, Minn. <\/b><br>  Patrick Kasl, 2016-2017 <br>","<b> Burlington, Wis. <\/b><br>  Hegeman Tiedt, 2016-2018 <br>","<b> Kansas City, Mo. <\/b><br>  A.J. Taylor, 2016-2019 <br>","<b> Macon, Ga. <\/b><br>  Quintez Cephus, 2016-2019 <br>","<b> Chandler, Ariz. <\/b><br>  Garrett Rand, 2016-2020 <br> Malik Reed, 2020 <br>","<b> Howard, Kansas <\/b><br>  Isaiahh Loudermilk, 2016-2020 <br>","<b> Springfield, Ohio <\/b><br>  Danny Davis III, 2017-2021 <br>","<b> Rockville, Md. <\/b><br>  Rachid Ibrahim, 2017 <br>","<b> Sayville, N.Y. <\/b><br>  Jack Coan, 2017-2020 <br>","<b> Rock Valley, Iowa <\/b><br>  Andrew Van Ginkel, 2017-2018 <br>","<b> Austin, Texas <\/b><br>  Cade Green, 2017-2019 <br> Nakia Watson, 2018-2020 <br>","<b> Salem, N.J. <\/b><br>  Jonathan Taylor, 2017-2019 <br>","<b> Kernersville, N.C. <\/b><br>  Madison Cone, 2017-2020 <br>","<b> Detroit, Mich. <\/b><br>  Scott Nelson, 2017-2021 <br>","<b> Miami Gardens, Fla. <\/b><br>  Paul Jackson, 2017-2018 <br>","<b> Bolingbrook, Ill. <\/b><br>  Izayah Green-May, 2017-2020 <br>","<b> Mesa, Ariz. <\/b><br>  Adam Bay, 2017-2020 <br>","<b> De Pere, Wis. <\/b><br>  Aaron Vopal, 2017-2020 <br> Max Rader, 2023 <br>","<b> Columbus, Wis. <\/b><br>  Andy Vujnovich, 2020-2022 <br> Josh Seltzner, 2017-2021 <br>","<b> Denver, Colo. <\/b><br>  Al Ashford III, 2021-2022 <br> Deron Harrell, 2017-2020 <br>","<b> Brooklyn, N.Y. <\/b><br>  Aron Cruickshank, 2018 <br>","<b> Loganville, Ga. <\/b><br>  Donte Burton, 2018-2020 <br>","<b> Inkster, Mich. <\/b><br>  Reggie Pearson, 2018-2019 <br>","<b> Clayton, Ind. <\/b><br>  Isaac Guerendo, 2018-2022 <br>","<b> Culver City, Calif. <\/b><br>  Alexander Smith, 2018-2023 <br>","<b> Katy, Texas <\/b><br>  Collin Wilder, 2018-2021 <br>","<b> Lafayette, Calif. <\/b><br>  John Torchio, 2018-2022 <br>","<b> Lodi, Wis. <\/b><br>  Jacob Heyroth, 2018-2019 <br>","<b> Humble, Texas <\/b><br>  Travian Blaylock, 2018-2023 <br>","<b> Sun Prairie, Wis. <\/b><br>  Cooper Nelson, 2019-2020 <br> Marty Strey, 2018-2023 <br>","<b> Brownstown, Mich. <\/b><br>  Jaylan Franklin, 2018-2022 <br>","<b> Grantsburg, Wis. <\/b><br>  John Chenal, 2018-2021 <br> Leo Chenal, 2019-2021 <br>","<b> Deer Park, Ill. <\/b><br>  Bryan Sanborn, 2021-2023 <br> Jack Sanborn, 2018-2021 <br>","<b> Milan, Mich. <\/b><br>  Michael Furtney, 2018-2023 <br>","<b> Southfield, Mich. <\/b><br>  Taj Mustapha, 2018-2020 <br>","<b> Lincoln, Neb. <\/b><br>  Bryson Williams, 2018-2021 <br>","<b> Combined Locks, Wis. <\/b><br>  Boyd Dietzen, 2018-2020 <br>","<b> Eau Claire, Wis. <\/b><br>  Cormac Sampson, 2018-2021 <br> Duncan McKinley, 2021-2023 <br>","<b> Overland Park, Kan. <\/b><br>  Graham Mertz, 2019-2022 <br>","<b> Columbia, Md. <\/b><br>  Dean Engram, 2019-2022 <br>","<b> Redondo Beach, Calif. <\/b><br>  Spencer Lytle, 2019-2022 <br>","<b> Grand Rapids, Mich. <\/b><br>  Logan Brown, 2019-2021 <br> Stephan Bracey Jr., 2019-2021 <br>","<b> Long Beach, Calif. <\/b><br>  Titus Toler, 2019-2022 <br>","<b> San Francisco, Calif. <\/b><br>  Cam Phillips, 2019 <br>","<b> Pembroke Pines, Fla. <\/b><br>  Semar Melvin, 2019-2022 <br>","<b> Akron, Ohio <\/b><br>  Darryl Peterson, 2021-2023 <br> Quan Easterling, 2019-2020 <br>","<b> Pittsburgh, Pa. <\/b><br>  Dante Caputo, 2019-2020 <br>","<b> Holmen, Wis. <\/b><br>  Tatum Grass, 2019-2023 <br>","<b> Lititz, Pa. <\/b><br>  Hayden Rucci, 2019-2023 <br> Nolan Rucci, 2021-2023 <br>","<b> Wichita, Kan. <\/b><br>  Clay Cundiff, 2019-2022 <br>","<b> Maple City, Mich. <\/b><br>  Travis Wiltjer, 2019 <br>","<b> Los Angeles, Calif. <\/b><br>  Gio Paez, 2019-2023 <br>","<b> Fennimore, Wis. <\/b><br>  Logan O'Brien, 2019 <br>","<b> San Diego, Calif. <\/b><br>  Peter Bowden, 2019-2023 <br>","<b> Fort Wayne, Ind. <\/b><br>  Joe Tippmann, 2019-2022 <br>","<b> Janesville, Wis. <\/b><br>  Keeanu Benton, 2019-2022 <br>","<b> Newark, N.J. <\/b><br>  Jalen Berger, 2020 <br>","<b> Sergeant Bluff, Iowa <\/b><br>  Daniel Wright, 2020 <br>","<b> Colorado Springs, Colo. <\/b><br>  Max Lofy, 2020-2023 <br>","<b> Kauai, Hawaii <\/b><br>  Nick Herbig, 2020-2022 <br>","<b> Neenah, Wis. <\/b><br>  Jack Van Dyke, 2020-2023 <br>","<b> Verona, Wis. <\/b><br>  Haakon Anderson, 2020-2023 <br>","<b> Memphis, Tenn. <\/b><br>  Isaac Smith, 2020-2021 <br>","<b> Oshkosh, Wis. <\/b><br>  Gavin Meyers, 2020-2023 <br>","<b> Elysburg, Pa. <\/b><br>  Preston Zachman, 2020-2023 <br>","<b> Pomfret, Conn. <\/b><br>  Cam Large, 2020-2023 <br>","<b> St. Paul, Minn <\/b><br>  Kaden Johnson, 2020-2023 <br>","<b> Farmington, Mich. <\/b><br>  Jordan Turner, 2020-2023 <br>","<b> Winona, Minn. <\/b><br>  Aaron Witt, 2020-2023 <br>","<b> St. Charles, Ill. <\/b><br>  Dylan Barrett, 2020-2023 <br>","<b> Kewaunee, Wis. <\/b><br>  Tanor Bortolini, 2020-2023 <br>","<b> Shorewood, Wis. <\/b><br>  Sean Timmis, 2020-2023 <br>","<b> Stratford, Wis. <\/b><br>  Ben Barten, 2020-2023 <br>","<b> Oconomowoc, Wis. <\/b><br>  Trey Wedig, 2020-2023 <br>","<b> Huntersville, N.C. <\/b><br>  Devin Chandler, 2020 <br>","<b> Houlton, Wis. <\/b><br>  Cade McDonald, 2020-2023 <br> Will McDonald, 2023 <br>","<b> Tiffin, Iowa <\/b><br>  T.J. Bollers, 2021-2023 <br>","<b> Naples, Fla. <\/b><br>  Chez Mellusi, 2021-2023 <br> Jonas Duclona, 2023 <br>","<b> Santa Barbara, Calif. <\/b><br>  Deacon Hill, 2021 <br>","<b> Bronx, N.Y. <\/b><br>  Skyler Bell, 2021-2023 <br>","<b> Rosemount, Minn. <\/b><br>  Jake Ratzlaff, 2021-2022 <br>","<b> Glenview, Ill. <\/b><br>  Nate Van Zelst, 2021-2023 <br>","<b> Arlington Heights, Ill. <\/b><br>  Alex Moeller, 2021-2023 <br> Zach Zei, 2021-2023 <br>","<b> Cape Coral, Fla. <\/b><br>  Jake Chaney, 2021-2023 <br>","<b> Whitefish Bay, Wis. <\/b><br>  Grover Bortolotti, 2021-2023 <br> Joe Brunner, 2022-2023 <br>","<b> Eagan, Minn. <\/b><br>  Garrison Solliday, 2021-2023 <br>","<b> Lakeville, Minn. <\/b><br>  Riley Mahlman, 2021-2023 <br>","<b> Arvada, Colo. <\/b><br>  Isaac Townsend, 2021-2023 <br>","<b> Medford, N.J. <\/b><br>  Mike Jarvis, 2021-2023 <br>","<b> Corona, Calif. <\/b><br>  Jay Shaw, 2022 <br>","<b> East St. Louis, Ill. <\/b><br>  Keontez Lewis, 2022 <br>","<b> Paterson, N.J. <\/b><br>  A'Khoury Lyde, 2022 <br>","<b> Palm Beach Gardens, Fla. <\/b><br>  Cedrick Dort Jr., 2022 <br>","<b> Southlake, Texas <\/b><br>  Avyonne Jones, 2022 <br>","<b> Johnston City, Ill. <\/b><br>  Austin Brown, 2022-2023 <br>","<b> Pacific Palisades, Calif. <\/b><br>  Marshall Howe, 2022 <br>","<b> Honolulu, Hawaii <\/b><br>  Kamo'i Latu, 2022-2023 <br> Trech Kekahuna, 2023 <br>","<b> DeWitt, Mich. <\/b><br>  Tommy McIntosh, 2022-2023 <br>","<b> Trafford, Pa. <\/b><br>  Cade Yacamelli, 2022-2023 <br>","<b> Pontiac, Mich. <\/b><br>  Justin Clark, 2022 <br>","<b> Arlington, Texas <\/b><br>  Cam Fane, 2022-2023 <br>","<b> Prior Lake, Minn. <\/b><br>  Grady O'Neill, 2022-2023 <br>","<b> Monroe, Wis. <\/b><br>  JT Seagreaves, 2022-2023 <br>","<b> Fitchburg, Wis. <\/b><br>  Jackson Trudgeon, 2022-2023 <br>","<b> Spring Green, Wis. <\/b><br>  Zach Gloudeman, 2022-2023 <br>","<b> DeForest, Wis. <\/b><br>  Deven Magli, 2022-2023 <br>","<b> Wixom, Mich. <\/b><br>  Aidan Vaughan, 2022-2023 <br>","<b> Baraboo, Wis. <\/b><br>  Luna Larson, 2022 <br>","<b> Lone Tree, Colo. <\/b><br>  Gabe Kirschke, 2022-2023 <br>","<b> Watertown, Wis. <\/b><br>  John  Clifford, 2022-2023 <br>","<b> Fort Atkinson, Wis. <\/b><br>  Drew Evans, 2022 <br>","<b> St. Louis, Mo. <\/b><br>  Chris Brooks Jr., 2022-2023 <br>","<b> Louisville, Ky. <\/b><br>  Vinny Anthony II, 2022-2023 <br>","<b> Jefferson City, Mo. <\/b><br>  Vito Calvaruso, 2022 <br>","<b> Scottsdale, Ariz <\/b><br>  Tristan Monday, 2022 <br>","<b> Cornelius, N.C. <\/b><br>  Curt Neal, 2022-2023 <br>","<b> Kaukauna, Wis. <\/b><br>  Gavin Lahm, 2022-2023 <br>","<b> Mission Viejo, Calif. <\/b><br>  C.J. Williams, 2023 <br>","<b> Flower Mound, Texas <\/b><br>  Nick Evers, 2023 <br>","<b> Glenn Dale, Md. <\/b><br>  Michael Mack, 2023 <br>","<b> Waco, Texas <\/b><br>  Tanner Mordecai, 2023 <br>","<b> Allen, Texas <\/b><br>  Bryson Green, 2023 <br>","<b> Mentor, Ohio <\/b><br>  Nyzier Fourqurean, 2023 <br>","<b> Roseville, Mich. <\/b><br>  Amare Snowden, 2023 <br>","<b> Broomfield, Colo. <\/b><br>  Cole LaCrue, 2023 <br>","<b> Rockwall, Texas <\/b><br>  Braedyn Locke, 2023 <br>","<b> Norfolk, Va. <\/b><br>  Darian Varner, 2023 <br>","<b> Hamilton, Ohio <\/b><br>  Braedyn Moore, 2023 <br>","<b> Marietta, Ga. <\/b><br>  Jace Arnold, 2023 <br>","<b> Broadview, Ill. <\/b><br>  Justin Taylor, 2023 <br>","<b> Batavia, Ill. <\/b><br>  Tyler Jansey, 2023 <br>","<b> Darien, Conn. <\/b><br>  Christian Alliegro, 2023 <br>","<b> College Station, Texas <\/b><br>  A.J. Tisdell, 2023 <br>","<b> Seattle, Wash. <\/b><br>  Tucker Ashcraft, 2023 <br>","<b> Medina, Ohio <\/b><br>  Jeff Pietrowski Jr., 2023 <br>","<b> Sydney, Australia <\/b><br>  Atticus Bertrams, 2023 <br>","<b> Mokena, Ill. <\/b><br>  Jake Renfro, 2023 <br>","<b> Fruita, Colo. <\/b><br>  Keane Bessert, 2023 <br>","<b> Gilbert, Ariz. <\/b><br>  James Durand, 2023 <br>","<b> Cashton, Wis. <\/b><br>  Zack Mlsna, 2023 <br>","<b> Minneapolis, Minn. <\/b><br>  Peyton Lange, 2023 <br>","<b> Prairie Du Sac, Wis. <\/b><br>  Nolan Vils, 2023 <br>","<b> Avon, Ohio <\/b><br>  Nathanial Vakos, 2023 <br>"],null,["Dayton, Ohio","Greenfield, Wis.","Reidsville, N.C.","Wautoma, Wis.","Cincinnati, Ohio","Glassboro, N.J.","Brookfield, Wis.","Sherwood, Wis.","Imperial, Pa.","Fort Lauderdale, Fla.","Pewaukee, Wis.","Madison, Wis.","Miramar, Fla.","Kingsport, Tenn.","Kenosha, Wis.","Virginia Beach, Va.","Ottawa, Ill.","Sunrise, Fla.","Dublin, Calif.","Delray Beach, Fla.","Milton, Wis.","Milwaukee, Wis.","Boynton Beach, Fla.","Washington Township, N.J.","Hillsdale, N.J.","Franklin, Wis.","Waunakee, Wis.","West Palm Beach, Fla.","Everett, Mass.","Chicago, Ill.","St. Paul, Minn.","Cedarburg, Wis.","Appleton, Wis.","Waukesha, Wis.","Nashotah, Wis.","Land O’ Lakes, Wis.","Kettering, Ohio","San Pedro, Calif.","Slinger, Wis.","Roseville, Calif.","Mount Calvary, Wis.","Hartland, Wis.","Aurora, Ill.","Glendale, Wis.","Racine, Wis.","Fairview Heights, Ill.","Columbus, Ohio","Wisconsin Rapids, Wis.","Somerset, Wis.","Menominee, Mich.","Merrill, Wis.","Huber Heights, Ohio","Northbrook, Ill.","Wind Lake, Wis.","Wales, Wis.","Cuba City, Wis.","Rochester, Ill.","Oconto, Wis.","Oregon, Wis.","Maumee, Ohio","Springfield, Minn.","Tacoma, Wash.","Barrington, Ill.","Medford, Wis.","Berlin, Wis.","Hemlock, Mich.","Mount Airy, Md.","Middleton, Wis.","Jefferson Hills, Pa.","Sheboygan, Wis.","Loveland, Ohio","Darlington, Wis.","Greendale, Wis.","Weston, Wis.","Mason, Ohio","Woodville, Wis.","Menomonee Falls, Wis.","Gotham, Wis.","Mount Lebanon, Pa.","Minnetonka, Minn.","Eden Prairie, Minn.","Buffalo Grove, Ill.","Jacksonville, Fla.","Sao Paulo, Brazil","Jesup, Ga.","Ocala, Fla.","Oak Hill, Fla.","Montreal, Wisconsin","Logan, Utah","Goose Creek, S.C.","Delavan, Wis.","Tampa, Fla.","Capitol Heights, Md.","Waupaca, Wis.","Stoughton, Wis.","Muskego, Wis.","Fond du Lac, Wis.","Silver Lake, Wis.","Lanham, Md.","Lake Villa, Ill.","Curtice, Ohio","New Berlin, Wis.","Grafton, Wis.","Cottage Grove, Wis.","Kapolei, Hawaii","East Troy, Wis.","Screven, Ga.","Okauchee, Wis.","Round Lake Beach, Ill.","West Chester, Pa.","Atlanta, Ga.","Oak Creek, Wis.","Birmingham, Ala.","Orlando, Fla.","Wausau, Wis.","Kimberly, Wis.","Green Bay, Wis.","Bradenton, Fla.","Orange, Calif.","DeSoto, Texas","Mequon, Wis.","Marshall, Wis.","Brown Deer, Wis.","Menasha, Wis.","Stevens Point, Wis.","Pago Pago, American Samoa","Black Creek, Wis.","Northville, Mich.","San Marcos, Calif.","Seymour, Wis.","Delafield, Wis.","Richfield, Wis.","Fort Lauderdale,                                                                Fla.","Downers Grove, Ill.","Stevens Point,                                                                Wis.","Scottsdale, Ariz.","Pickerington, Ohio","Glenarden, Md.","Amherst Junction, Wis.","Flowery Branch, Ga.","Grand Prairie, Texas","Highland Park, Ill.","Washington, D.C.","Menomonie, Wis.","Severn, Md.","Hazel Crest, Ill.","Miami, Fla.","Glen Ellyn, Ill.","Pittsfield, Mass.","Carmel, Ind.","Dublin, Ohio","Long Grove, Ill.","Amherst, Wis.","Wyoming, Minn.","Burlington, Wis.","Kansas City, Mo.","Macon, Ga.","Chandler, Ariz.","Howard, Kansas","Springfield, Ohio","Rockville, Md.","Sayville, N.Y.","Rock Valley, Iowa","Austin, Texas","Salem, N.J.","Kernersville, N.C.","Detroit, Mich.","Miami Gardens, Fla.","Bolingbrook, Ill.","Mesa, Ariz.","De Pere, Wis.","Columbus, Wis.","Denver, Colo.","Brooklyn, N.Y.","Loganville, Ga.","Inkster, Mich.","Clayton, Ind.","Culver City, Calif.","Katy, Texas","Lafayette, Calif.","Lodi, Wis.","Humble, Texas","Sun Prairie, Wis.","Brownstown, Mich.","Grantsburg, Wis.","Deer Park, Ill.","Milan, Mich.","Southfield, Mich.","Lincoln, Neb.","Combined Locks, Wis.","Eau Claire, Wis.","Overland Park, Kan.","Columbia, Md.","Redondo Beach, Calif.","Grand Rapids, Mich.","Long Beach, Calif.","San Francisco, Calif.","Pembroke Pines, Fla.","Akron, Ohio","Pittsburgh, Pa.","Holmen, Wis.","Lititz, Pa.","Wichita, Kan.","Maple City, Mich.","Los Angeles, Calif.","Fennimore, Wis.","San Diego, Calif.","Fort Wayne, Ind.","Janesville, Wis.","Newark, N.J.","Sergeant Bluff, Iowa","Colorado Springs, Colo.","Kauai, Hawaii","Neenah, Wis.","Verona, Wis.","Memphis, Tenn.","Oshkosh, Wis.","Elysburg, Pa.","Pomfret, Conn.","St. Paul, Minn","Farmington, Mich.","Winona, Minn.","St. Charles, Ill.","Kewaunee, Wis.","Shorewood, Wis.","Stratford, Wis.","Oconomowoc, Wis.","Huntersville, N.C.","Houlton, Wis.","Tiffin, Iowa","Naples, Fla.","Santa Barbara, Calif.","Bronx, N.Y.","Rosemount, Minn.","Glenview, Ill.","Arlington Heights, Ill.","Cape Coral, Fla.","Whitefish Bay, Wis.","Eagan, Minn.","Lakeville, Minn.","Arvada, Colo.","Medford, N.J.","Corona, Calif.","East St. Louis, Ill.","Paterson, N.J.","Palm Beach Gardens, Fla.","Southlake, Texas","Johnston City, Ill.","Pacific Palisades, Calif.","Honolulu, Hawaii","DeWitt, Mich.","Trafford, Pa.","Pontiac, Mich.","Arlington, Texas","Prior Lake, Minn.","Monroe, Wis.","Fitchburg, Wis.","Spring Green, Wis.","DeForest, Wis.","Wixom, Mich.","Baraboo, Wis.","Lone Tree, Colo.","Watertown, Wis.","Fort Atkinson, Wis.","St. Louis, Mo.","Louisville, Ky.","Jefferson City, Mo.","Scottsdale, Ariz","Cornelius, N.C.","Kaukauna, Wis.","Mission Viejo, Calif.","Flower Mound, Texas","Glenn Dale, Md.","Waco, Texas","Allen, Texas","Mentor, Ohio","Roseville, Mich.","Broomfield, Colo.","Rockwall, Texas","Norfolk, Va.","Hamilton, Ohio","Marietta, Ga.","Broadview, Ill.","Batavia, Ill.","Darien, Conn.","College Station, Texas","Seattle, Wash.","Medina, Ohio","Sydney, Australia","Mokena, Ill.","Fruita, Colo.","Gilbert, Ariz.","Cashton, Wis.","Minneapolis, Minn.","Prairie Du Sac, Wis.","Avon, Ohio"],{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null]}],"limits":{"lat":[-33.8688197,47.6061389],"lng":[-170.7020359,151.2092955]}},"evals":[],"jsHooks":[]}</script>
+<p>Getting distance from Madison, WI for all cities in our dataset.</p>
+<pre class="r"><code>year_dists = players_raw
+# Fix the two individual cities
+players_raw$Hometown[year_dists$Hometown == &quot;Howard, Kan.&quot;] = &quot;Howard, Kansas&quot;
+players_raw$Hometown[year_dists$Hometown == &quot;Montreal, Wis.&quot;] = &quot;Montreal, Wisconsin&quot;
+madison_dists = c()
+madison = geocode(&quot;Madison WI&quot;)
+for (i in 1:nrow(players_raw)){
+  city = geocodes %&gt;% filter(Hometown == players_raw$Hometown[i]) %&gt;% select(lon, lat)
+  if (is.na(city$lon[1]) || is.na(city$lat[1])){
+    print(players_raw$Hometown[i])
+  }
+  madison_dists = append(madison_dists, distHaversine(madison, c(city$lon[1], city$lat[1])))
+}
+year_dists$dist_madison = madison_dists</code></pre>
+<p>Average Distance From Madison by Year</p>
+<pre class="r"><code>avg_distances = year_dists %&gt;% 
+  group_by(Year) %&gt;% 
+  summarize(avg_dist = mean(dist_madison/1000))
+
+ggplot(avg_distances, aes(Year, avg_dist)) +
+  geom_col(fill=&quot;lightblue&quot;, color=&quot;black&quot;) +
+  ylab(&quot;Distance (km)&quot;) +
+  ggtitle(&quot;Average Distance from Madison of UW Football Players&quot;)</code></pre>
+<p><img src="data:image/png;base64,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mn4laVWJNPhm27Zt6fzzz69SvOc975nWrVtXfbbfqCim9qaJ7fi6665L//mf/1mV4R73uEfasGFD9XmYN9/+9rfTNddcU0wavx/xOxLDj370o/STn/ykeL9x48b0i7/4i8X7Qf/i9yjWr3LYZZdd0kEHHVR+7PtaX+YOO+yQ7nKXu/SdvnNk7A8vuOCCzq9H+jxKWUdKeMoTf+c730lXX311kYs73OEOac8995xyjn6++Po6GPvk2J+WQ79x5TTDvA5zPBbpxDHZpk2bUqx/++67b4r1YZihqXwOsyzTECBAgACBhRFoGeZS4IlPfGIrr4TV38te9rK5LIdMNyvwyU9+slon6utHr/c5QNG63e1u13ra057WOv3004fKzOMf//hqGW984xuHmmelE+Xg20qTMP+YAqeddlpru+22q+q8XJdygGHMFNfGbKeeeuoyszvf+c5jFf6nP/3psjp4whOeMFZak5rp2muvbSvvDTfc0Laoaew32jKwxj80tR1//vOfb6vnSy65ZGTZI488skrj2c9+djX/O97xjur7HARqXX/99dW4fm9e/OIXV/PF/ilfoOk3edu4Rz3qUdW8T37yk9vGDfMhB5Wr+ct946ivOQA8zKJmcpp+v82PfOQjK5u3v/3tM5X/+jr4v//3/27LW79xbRMO+DDq8VisN3FMdt/73rf1lre8pZUD+32X0FQ++y7ESAIECBAgsGACusDnI455G7Zs2ZI+9KEPtWX7b//2b9Mtt9zS9p0PBAYJ5P1Z+uEPf5je+c53poc85CHF30UXXTRotlUb/81vfjM96EEPSvnEdNWWaUE/FzjvvPPScccdl2699daff/nf74ZtnbVsxjX8RbSIOvfcc0cWiNa33epg5ITMsCYF5mU7fvCDH1zVz0033ZS++MUvVp/7vcmBprbR0arzq1/9att33T7E79//+T//pxr10Ic+tHrvTX8Bv839fcYdG+vkOeeck571rGcVrUH/7u/+btykzEeAAAECBAh0EdAFvgvKrH+Vr1anrVu3Ftm87W1vW3QZy60w0kc/+tH0uMc9btazL3+rKJBbEqTceq9tiRFIya21ii6Isd7UAytnnHFGOvzww1Nu5ZPitgrTHKIr5C/90i8VXa6ju75h9QVe+tKXptySr1hwdFXNLc1TdHnNLbPSXnvttfoZWoAl/tM//VO6173u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yTL94z/+41ApPOIRj0jvec97JvqwpaEyYiICBAgQIECAAAECDQvEQ4o2bdqU4rU+xMOrIhg66AGg9Xm8J0CAAAEC0xbQBX7aNWD5MyVw2mmnFU+1vM997tMzX4cffnh6xzvekT760Y8KfvZUMoIAAQIECBAgQGCeBbbbbru0//77V0VYWlpKce/7M888U/CzUvGGAAECBOZFQAvQeakp+Vx1gUsvvTRddNFFxV90gY8nXh544IHpgAMOWPW8WCABAgQIECBAgACB1Rb46U9/WrT23Lp1azrqqKPSLrvsstpZsDwCBAgQINCIgABoI4wSIUCAAAECBAgQIECAAAECBAgQIEBgFgV0gZ/FWpEnAgQIECBAgAABAgQIECBAgAABAgQaERAAbYRRIgQIECBAgAABAgQIECBAgAABAgQIzKKAAOgs1oo8ESBAgAABAgQIECBAgAABAgQIECDQiIAAaCOMEiFAgAABAgQIECBAgAABAgQIECBAYBYFBEBnsVbkiQABAgQIECBAgAABAgQIECBAgACBRgQEQBthlAgBAgQIECBAgAABAgQIECBAgAABArMoIAA6i7UiTwQIECBAgAABAgQIECBAgAABAgQINCIgANoIo0QIECBAgAABAgQIECBAgAABAgQIEJhFAQHQWawVeSJAgAABAgQIECBAgAABAgQIECBAoBEBAdBGGCVCgAABAgQIECBAgAABAgQIECBAgMAsCgiAzmKtyBMBAgQIECBAgAABAgQIECBAgAABAo0ICIA2wigRAgQIECBAgAABAgQIECBAgAABAgRmUUAAdBZrRZ4IECBAgAABAgQIECBAgAABAgQIEGhEYKmRVCTSqMCWLVvSDTfc0GiaEluZwA477JB23XXXdOmll64sIXM3KrD77runzZs3F2n+9Kc/Tbfeemuj6UtsfIFddtklbdq0KV122WXjJ2LOxgVuc5vbpKWlpdRqtdKPf/zjxtOX4PgCe+yxR1EvV1111fiJmLNxgX333bdI8+abb06XX3554+lLcHyBvffeuzhevuaaa8ZPxJyNCsTvS/zOxBDnMnFOY5gNgXXr1qV99tknxW/M1q1bZyNTclGcx8T5TAyxL7v22mupzIjAhg0b0l577VWcy9xyyy0zkivZCIHy2GwcDS1Ax1EzDwECBAgQIECAAAECBAgQIECAAAECcyEgADoX1SSTBAgQIECAAAECBAgQIECAAAECBAiMIyAAOo6aeQgQIECAAAECBAgQIECAAAECBAgQmAsBAdC5qCaZJECAAAECBAgQIECAAAECBAgQIEBgHAEB0HHUzEOAAAECBAgQIECAAAECBAgQIECAwFwICIDORTXJJAECBAgQIECAAAECBAgQIECAAAEC4wgIgI6jZh4CBAgQIECAAAECBAgQIECAAAECBOZCQAB0LqpJJgkQIECAAAECBAgQIECAAAECBAgQGEdAAHQcNfMQIECAAAECBAgQIECAAAECBAgQIDAXAgKgc1FNMkmAAAECBAgQIECAAAECBAgQIECAwDgCAqDjqJmHAAECBAgQIECAAAECBAgQIECAAIG5EBAAnYtqkkkCBAgQIECAAAECBAgQIECAAAECBMYREAAdR808BAgQIECAAAECBAgQIECAAAECBAjMhYAA6FxUk0wSIECAAAECBAgQIECAAAECBAgQIDCOgADoOGrmIUCAAAECBAgQIECAAAECBAgQIEBgLgQEQOeimmSSAAECBAgQIECAAAECBAgQIECAAIFxBARAx1EzDwECBAgQIECAAAECBAgQIECAAAECcyEgADoX1SSTBAgQIECAAAECBAgQIECAAAECBAiMIyAAOo6aeQgQIECAAAECBAgQIECAAAECBAgQmAsBAdC5qCaZJECAAAECBAgQIECAAAECBAgQIEBgHAEB0HHUzEOAAAECBAgQIECAAAECBAgQIECAwFwICIDORTXJJAECBAgQIECAAAECBAgQIECAAAEC4wgIgI6jZh4CBAgQIECAAAECBAgQIECAAAECBOZCQAB0LqpJJgkQIECAAAECBAgQIECAAAECBAgQGEdAAHQcNfMQIECAAAECBAgQIECAAAECBAgQIDAXAgKgc1FNMkmAAAECBAgQIECAAAECBAgQIECAwDgCAqDjqJmHAAECBAgQIECAAAECBAgQIECAAIG5EBAAnYtqkkkCBAgQIECAAAECBAgQIECAAAECBMYREAAdR808BAgQIECAAAECBAgQIECAAAECBAjMhYAA6FxUk0wSIECAAAECBAgQIECAAAECBAgQIDCOgADoOGrmIUCAAAECBAgQIECAAAECBAgQIEBgLgQEQOeimmSSAAECBAgQIECAAAECBAgQIECAAIFxBARAx1EzDwECBAgQIECAAAECBAgQIECAAAECcyEgADoX1SSTBAgQIECAAAECBAgQIECAAAECBAiMI7A0zkzmIUCAAAECa1ngZS97WbrpppvmjmD77bdP69evT61WK11//fVzl//I8Mknn5yiHAYCBAgQIECAAAECBAgMKyAAOqyU6QgQIECAwH8LvPe970033HADjykInHTSSQKgU3C3SAIECBAgQIAAAQLzLKAL/DzXnrwTIECAAAECBAgQIECAAAECBAgQINBXQAvQvjxGEiBAgACB3gI7775Heuar/rr3BMY0IvDeV52cLv3ehY2kJRECBAgQIECAAAECBNaegADo2qtzJSZAgACBhgSWNmxMd73v/RpKTTK9BLbfaedeo3xPgAABAgQIECAwgwJxz/kLLrhgBnM2OEtLS0tp9913T1dddVW65ZZbBs8wg1MceuihM5ir6WZJAHS6/pZOgAABAgQIECBAgAABAgQIEFgogXhg6NFHH71QZZqnwlxyySXzlN1Vyat7gK4Ks4UQIECAAAECBAgQIECAAAECBAgQIDANAS1Ap6E+YJnr1q1LGzZsGDCV0aspsN122xWLUy+rqT54WevX//waTnRTqH8ePLcpJilQ1oVtZpLKazPtWKcWcb2K3/4YFrFsi7CmOjabvVqMOonfGtvM7NRNebwcOVI3s1MvkZPyNyaOl20zs1M3UR/lsIjbzLZt28ripe132iUd+oCjqs/eTEbgK589I229/roicdv6cuOfb3HLx/lmSgKxI9x1112ntHSL7Sew11579Rtt3BQF9thjjyku3aJ7CSzqNlOeSPQqt+8nJ7Dnnnum3XbbbXILmHLKmzZtmnIOLL6bQBybLer+rFt55+W7HXbYIcWfYfYEYl9mfzZ79bLzzjun+DPMnsCOO+6Y4m+RhhtvvLEqzp777peOP+WN1WdvJiNw0qOPTFsvvq646OG4ZbmxAOhyk6l/EzfZvfzyy6eeDxn4ucDmzZvTTjvtpF5+TjIT73bZZZe0cePGIi9XXnllql9lnIkMruFMxAFcXHXcsmXLQirETd0N0xG44oor5vZm9P3EYn8W69U111zTbzLjVlmgPHmIY7NF3Z+tMmlji4sLn1u3bk3XX399Y2lKaGUC0QI0HhoSQwQ+7M9W5tnk3HHhNi4gRp3Ug1JNLkNaowvERYIyIH3dddelG264YfREZngO69r0KieOKRc1plQem42jKwA6jtqE54mV9eabb57wUiQ/ikDZfFy9jKI2+WnrAc84Ob311lsnv1BLGEqgrBvbzFBcJhpBINapRVyv4rff7/8IK8IqT6puVhl8iMVFncRvzSLuD4Yo/kxOEnVSDuqmlJiN17LnShwv22Zmo04iF/XbRiziNmNdm+66xn+5/89voLd8nG8IECBAgAABAgQIECBAgAABAgQIECAw1wICoHNdfTJPgAABAgQIECBAgAABAgQIECBAgEA/AQHQfjrGESBAgAABAgQIECBAgAABAgQIECAw1wICoHNdfTJPgAABAgQIECBAgAABAgQIECBAgEA/AQHQfjrGESBAgAABAgQIECBAgAABAgQIECAw1wICoHNdfTJPgAABAgQIECBAgAABAgQIECBAgEA/AQHQfjrGESBAgAABAgQIECBAgAABAgQIECAw1wICoHNdfTJPgAABAgQIECBAgAABAgQIECBAgEA/AQHQfjrGESBAgAABAgQIECBAgAABAgQIECAw1wICoHNdfTJPgAABAgQIECBAgAABAgQIECBAgEA/AQHQfjrGESBAgAABAgQIECBAgAAGISfLAABAAElEQVQBAgQIECAw1wICoHNdfTJPgAABAgQIECBAgAABAgQIECBAgEA/AQHQfjrGESBAgAABAgQIECBAgAABAgQIECAw1wICoHNdfTJPgAABAgQIECBAgAABAgQIECBAgEA/AQHQfjrGESBAgAABAgQIECBAgAABAgQIECAw1wICoHNdfTJPgAABAgQIECBAgAABAgQIECBAgEA/AQHQfjrGESBAgAABAgQIECBAgAABAgQIECAw1wJLc517mSdAgMACC3z7299OZ5111lyWcPPmzWlpaSlde+21c5n/gw46KB111FFzmXeZJkCAAAECBAgQIECAAIF2AQHQdg+fCBAgMDMC5557bnrZy142M/lZSxl57GMfKwC6lipcWQkQIECAAAECBAgQWGgBXeAXunoVjgABAgQIECBAgAABAgQIECBAgMDaFtACdG3Xv9ITIDAnAvc88qHpF+93xJzkdj6zecWlP0qfeOdb5jPzck2AAAECBAgQIECAAAECPQUEQHvSGEGAAIHZETjwHoelo4590uxkaAFzctE3LhAAXcB6VSQCBAgQIECAAAECBAjoAm8dIECAAAECBAgQIECAAAECBAgQIEBgYQUEQBe2ahWMAAECBAgQIECAAAECBAgQIECAAAEBUOsAAQIECBAgQIAAAQIECBAgQIAAAQILKyAAurBVq2AECBAgQIAAAQIECBAgQIAAAQIECAiAWgcIECBAgAABAgQIECBAgAABAgQIEFhYAQHQha1aBSNAgAABAgQIECBAgAABAgQIECBAQADUOkCAAAECBAgQIECAAAECBAgQIECAwMIKCIAubNUqGAECBAgQIECAAAECBAgQIECAAAECAqDWAQIECBAgQIAAAQIECBAgQIAAAQIEFlZAAHRhq1bBCBAgQIAAAQIECBAgQIAAAQIECBAQALUOECBAgAABAgQIECBAgAABAgQIECCwsAJLC1syBSNAgAABAgTWlMCNN96Ybrrpprks89LSUmq1Wumaa66Zy/xv2rQpbdy4cS7zLtMECBAgQIAAAQKLLyAAuvh1rIQECBAgQGBNCLzmNa9Jb3nLW9ZEWWetkC960YvSCSecMGvZkh8CBAgQIECAAAEChYAu8FYEAgQIECBAgAABAgQIECBAgAABAgQWVkAL0IWtWgUjQIAAAQJrV2DvA+6Ydth5l7ULsAolv27LVemyH/1gFZZkEQQIECBAgAABAgRWJiAAujI/cxMgQIAAAQIzKPCEE1+c7nnkQ2YwZ4uTpbM//uF06ktOXJwCKQkBAgQIECBAgMDCCugCv7BVq2AECBAgQIAAAQIECBAgQIAAAQIECAiAWgcIECBAgAABAgQIECBAgAABAgQIEFhYAQHQha1aBSNAgAABAgQIECBAgAABAgQIECBAQADUOkCAAAECBAgQIECAAAECBAgQIECAwMIKCIAubNUqGAECBAgQIECAAAECBAgQIECAAAECAqDWAQIECBAgQIAAAQIECBAgQIAAAQIEFlZAAHRhq1bBCBAgQIAAAQIECBAgQIAAAQIECBAQALUOECBAgAABAgQIECBAgAABAgQIECCwsAICoAtbtQpGgAABAgQIECBAgAABAgQIECBAgIAAqHWAAAECBAgQIECAAAECBAgQIECAAIGFFRAAXdiqVTACBAgQIECAAAECBAgQIECAAAECBARArQMECBAgQIAAAQIECBAgQIAAAQIECCysgADowlatghEgQIAAAQIECBAgQIAAAQIECBAgIABqHSBAgAABAgQIECBAgAABAgQIECBAYGEFBEAXtmoVjAABAgQIECBAgAABAgQIECBAgAABAVDrAAECBAgQIECAAAECBAgQIECAAAECCysgALqwVatgBAgQIECAAAECBAgQIECAAAECBAgIgFoHCBAgQIAAAQIECBAgQIAAAQIECBBYWAEB0IWtWgUjQIAAAQIECBAgQIAAAQIECBAgQEAA1DpAgAABAgQIECBAgAABAgQIECBAgMDCCgiALmzVKhgBAgQIECBAgAABAgQIECBAgAABAgKg1gECBAgQIECAAAECBAgQIECAAAECBBZWQAB0YatWwQgQIECAAAECBAgQIECAAAECBAgQEAC1DhAgQIAAAQIECBAgQIAAAQIECBAgsLACAqALW7UKRoAAAQIECBAgQIAAAQIECBAgQIDAEgICBAgQIECAAAECkxK44oor0gtf+MJJJT/RdLfffvsi/W3btqUbb7xxosuaROK77bZbeu1rXzuJpKVJgAABAgQIEJgrAQHQuaoumSVAgAABAgQIzJfADTfckD75yU/OV6YXJLd77733gpREMQgQIECAAAECKxPQBX5lfuYmQIAAAQIECBAgQIAAAQIECBAgQGCGBbQAneHKkTUCBAgQIECAwCIJ3PmX7pWe+tJXL1KRZrIsL3/So9JNW2+YybzJFAECBAgQIEBgGgICoNNQt0wCBAgQIECAwBoU2Lz9jmn/Ox+8Bku+ukVev912q7tASyNAgAABAgQIzLiALvAzXkGyR4AAAQIECBAgQIAAAQIECBAgQIDA+AICoOPbmZMAAQIECBAgQIAAAQIECBAgQIAAgRkXEACd8QqSPQIECBAgQIAAAQIECBAgQIAAAQIExhcQAB3fzpwECBAgQIAAAQIECBAgQIAAAQIECMy4gADojFeQ7BEgQIAAAQIECBAgQIAAAQIECBAgML6AAOj4duYkQIAAAQIECBAgQIAAAQIECBAgQGDGBQRAZ7yCZI8AAQIECBAgQIAAAQIECBAgQIAAgfEFBEDHtzMnAQIECBAgQIAAAQIECBAgQIAAAQIzLiAAOuMVJHsECBAgQIAAAQIECBAgQIAAAQIECIwvIAA6vp05CRAgQIAAAQIECBAgQIAAAQIECBCYcQEB0BmvINkjQIAAAQIECBAgQIAAAQIECBAgQGB8AQHQ8e3MSYAAAQIECBAgQIAAAQIECBAgQIDAjAsIgM54BckeAQIECBAgQIAAAQIECBAgQIAAAQLjCwiAjm9nTgIECBAgQIAAAQIECBAgQIAAAQIEZlxAAHTGK0j2CBAgQIAAAQIECBAgQIAAAQIECBAYX0AAdHw7cxIgQIAAAQIECBAgQIAAAQIECBAgMOMCAqAzXkGyR4AAAQIECBAgQIAAAQIECBAgQIDA+AICoOPbmZMAAQIECBAgQIAAAQIECBAgQIAAgRkXWJrx/MkeAQIECBAgQIAAAQIECBAgQKCrwAc/+MH0tre9reu4Wf5y3bp1aWnpv0Iyt956a9q2bdssZ7dr3h796EenP/iDP+g6zpcEZk1AAHTWakR+CBAgQIAAAQIECBAgQIAAgaEELr/88vS1r31tqGlN1KzAfe5zn2YTlBqBCQroAj9BXEkTIECAAAECBAgQIECAAAECBAgQIDBdAS1Ap+tv6QQIECBAgAABAgQIECBAgEADAr/7oj9Lv/boxzeQkiR6CXzzi2enN51wXK/RvicwswICoDNbNTJGgAABAgQIECBAgAABAgQIDCuwtHFj2rT99sNObroxBDZs2DjGXGYhMH0BXeCnXwdyQIAAAQIECBAgQIAAAQIECBAgQIDAhAQEQCcEK1kCBAgQIECAAAECBAgQIECAAAECBKYvIAA6/TqQAwIECBAgQIAAAQIECBAgQIAAAQIEJiSwMPcA/du//dt0zTXXDGRav359et7znldNd/3116eYt9/w8Ic/PB100EFtk9x4443pAx/4QPrSl76UrrrqqnTwwQenww47LB199NFpu+22a5vWBwIECBAgQIAAAQIECBAgQIAAAQIEpiOwMAHQT37yk+myyy4bqNgZAL3wwguLQGa/GSOwWQ+AbtmyJT372c9OP/jBD4rZ9thjj/SpT32q+Dv77LPTy172srQx33zZQIAAAQIECBAgQIAAAQIECBAgQIDAdAUWJgD6zGc+M23durWr5q233ppOPfXU9LOf/SxFa8768O1vf7v4eO973zs96EEPqo+q3kfrzvrw8pe/vAh+Hn744emlL31p2nXXXdOPfvSj9OIXvzh97nOfS29605vSC17wgvos3hMgQIAAAQIECBAgQIAAAQIECBAgMAWBhQmAPvShD+3J93d/93dF8PPud797OvHEE9umKwOgEfx81KMe1Tau24dvfOMb6Zxzzknbb799esUrXpE2b95cTLb//vun173udelxj3tcitaoxx9/fNp55527JeE7AgQIECBAgAABAgQIECBAgAABAgRWSWDhH4J0/vnnp3e9611p06ZNRdf0DRs2tNFGF/gYDjnkkLbve30466yzilEPfOADq+BnOW10hb/vfe+bbrrppiIIWn7vlQABAgQIECBAgAABAgQIECBAgACB6QgsdAD0lltuSa997WtTq9VKT3va09K+++7bphzjv/vd76alpaV04IEHFuOim3w84KjX8PWvf70YFd3fuw0RAI3hq1/9arfRviNAgAABAgQIECBAgAABAgQIECBAYBUFFqYLfDezD37wg+miiy5Kt7/97dMTnvCEZZN8//vfTzfffHM64IAD0mmnnZY+/OEPpyuuuCLFg5Liuyc/+cmps2t93Oszht12221ZevXvywckdZ0ofxnpxL1Juw3xFPnOlqrdpvPd6gnEOhFD1I1hdgTWrVtXZWYR66Zc76pCerNqArFuLeI6tWqAE1xQ1EuvuqnvEyaYBUl3Eei3zfSqry7J+GoCAovs32+9mwClJAcI1Nc1dTMAa5VHl7+PcWxZr6dVzsbEFleWb2ILkHBPgX7b+iKuaz0hZnAE/+WVsrAB0Aguvu997ytKfOyxxxatPDuLX97/8+KLLy4ekrTXXnuleBhSBE3jLx52dO6556aTTjqpmvW6664r3vcKgO6yyy7F+HK6asaON8ccc0y68sorO779r4/xYKUnPelJXcf5croCe++993QzYOk9Bfbcc8+e4+Z1RLk/mdf8z3O+4/7O/bZ3B9rTq93b3OY2PS9C7rjjjtPL2Bpf8k477dRzm+n1kMo1TrYqxY+Tn377slXJxAQXEtu87X6CwCtIOn5Hy2clrCAZszYsEA/vXcTBszemV6s77LBDz9+Zfj1rp5fjtbHkOFdZ5N//cWtxYQOg//Ef/5Euu+yyFBvkwx72sK4+5f0/Y4d5yimnpMMOO6yYLrrMR2vQN7zhDenjH/94+pVf+ZV05JFHpm3btlVPmu+1k40TgBhs7AWDfwQIECBAgAABAgQIECBAgAABAgSmKrCwAdB/+Zd/KWCPPvroIgjaTfkpT3lK+vVf//UUV8L222+/apKIlsfT3KMVaARC3/ve9xYB0OgyEE9/v+GGG3oGOMvA58aNG6v0ur25//3vXzyZvtu42972tlWgtdt4362+QLSgiNsSaMWy+vb9lhh1Ujbtj20vLl4s0hC36DBMRyB6EfTb3hdtXZuO8nhLjXrpVTdxb2/DdARif9WrXnp9P52crq2lxr5qUf3jAaexr7bdz846HedQUS8xRN04jpmduomcRIvcqJOom0UbrGvTq9HYB/f6nSljI9PL3dpd8iL//q+kd8FCBkAvv/zy9IUvfKFY2x/72Mf2XOujFedd73rXnuMf/OAHFwHQ733ve0XrzwiARjf5uL/nNddc03W+8vtB3XH+8i//suv88eWWLVvSVVdd1XO8EasvEC2JI1CuXlbfvt8Sd9999yoAevXVVy/cAd2gW2n0szFuZQI33XST7X1lhBObO34jewWgex2ATywzEq4Ewr7Xb2Tsnw3TEYjeS73qZTo5am6p0bUv1rvy2Lu5lKU0rkA8WDZuUxJD/I7G/towGwIRnN5nn33Stdde2zNYNRs5HS8X0UDJMB2BCHL2+p0RAJ1OnZRL7VUv5fh5fe18uPko5VjIp8B/4hOfKAIh97rXvdId73jHUTzapo2WmDHED3gZiIgAaAy9DrbiKfIxRGDGQIAAAQIECBAgQIAAAQIECBAgQIDAdAUWMgD6b//2b4Xqb/zGb/TVff/735/e+ta3Fl3du034k5/8pPg6HkRS3vOzvJHsd7/73W6zpPL7fi1Lu87oSwIECBAgQIAAAQIECBAgQIAAAQIEGhdYuADo9ddfXwUhDz744L5gZ5xxRvqHf/iH9O53v7vrdJ///OeL7+9+97tX4+OeoTHEvJ1DdDMqg6/lA5U6p/GZAAECBAgQIECAAAECBAgQIECAAIHVE1i4AOi3vvWt4t5g8WCUAw44oK/kUUcdVYyPoOV3vvOdtmm//OUvp2ghGsNxxx1XjYsnwke3+m9/+9vpk5/8ZPV9vIlg6hVXXJHucIc7pMMPP7xtnA8ECBAgQIAAAQIECBAgQIAAAQIECKy+wMI9BOlHP/pRoXi7292ueGp3P9Jjjz02nX322em8885LT33qU9O9733v4u/CCy9MZ555ZjHrs5/97HTIIYdUycQNpJ/xjGekk08+OZ1yyinFw5aipekFF1xQvI+nUr/whS9MMZ2BAAECBAgQIECAAAECBAgQIECAAIHpCixcADRaYMZw4IEHDpSNVqKvec1ripabp512WopWn/EXw+1vf/v03Oc+N0WLz87hiCOOSK9//euLAGgESstgabQMPfHEE9Ohhx7aOYvPBGZa4DOf+Uy68sorZzqP3TK34447Vhc64gFkcRuKeRse/OAHp/LhavOWd/klQIAAAQIECBAgQIAAAQLzILBwAdBoyRl/ww6bN28uurg/5SlPSZdccknasmVLETzdaaed+iZxz3ves+giHwHXH/zgBykejrTPPvuk9esX7q4CfR2MXAyB173udemrX/3qYhRmzkrxkY98RAB0zupMdgkQIECAAAECBAgQIEBgvgQWLgA6Lv/S0lJxz9BB9w3tTH/PPfdM8WcgQIAAAQIECBAgQIAAAQIECBAgQGD2BARAZ69O5IjAVAUe86znp6WNG6eah0Vf+JdO/3i66BsXLHoxlY8AAQIECBAgQIAAAQIECMyEgADoTFSDTBCYHYGH/O7T0/Y79r8FxOzkdj5z8uPvfUcAdD6rTq4JECBAgAABAgQIECBAYA4F3LByDitNlgkQIECAAAECBAgQIECAAAECBAgQGE5AAHQ4J1MRIECAAAECBAgQIECAAAECBAgQIDCHAgKgc1hpskyAAAECBAgQIECAAAECBAgQIECAwHACAqDDOZmKAAECBAgQIECAAAECBAgQIECAAIE5FBAAncNKk2UCBAgQIECAAAECBAgQIECAAAECBIYTEAAdzslUBAgQIECAAAECBAgQIECAAAECBAjMoYAA6BxWmiwTIECAAAECBAgQIECAAAECBAgQIDCcgADocE6mIkCAAAECBAgQIECAAAECBAgQIEBgDgUEQOew0mSZAAECBAgQIECAAAECBAgQIECAAIHhBARAh3MyFQECBAgQIECAAAECBAgQIECAAAECcyggADqHlSbLBAgQIECAAAECBAgQIECAAAECBAgMJyAAOpyTqQgQIECAAAECBAgQIECAAAECBAgQmEMBAdA5rDRZJkCAAAECBAgQIECAAAECBAgQIEBgOAEB0OGcTEWAAAECBAgQIECAAAECBAgQIECAwBwKCIDOYaXJMgECBAgQIECAAAECBAgQIECAAAECwwkIgA7nZCoCBAgQIECAAAECBAgQIECAAAECBOZQQAB0DitNlgkQIECAAAECBAgQIECAAAECBAgQGE5AAHQ4J1MRIECAAAECBAgQIECAAAECBAgQIDCHAgKgc1hpskyAAAECBAgQIECAAAECBAgQIECAwHACAqDDOZmKAAECBAgQIECAAAECBAgQIECAAIE5FBAAncNKk2UCBAgQIECAAAECBAgQIECAAAECBIYTEAAdzslUBAgQIECAAAECBAgQIECAAAECBAjMoYAA6BxWmiwTIECAAAECBAgQIECAAAECBAgQIDCcgADocE6mIkCAAAECBAgQIECAAAECBAgQIEBgDgUEQOew0mSZAAECBAgQIECAAAECBAgQIECAAIHhBARAh3MyFQECBAgQIECAAAECBAgQIECAAAECcyggADqHlSbLBAgQIECAAAECBAgQIECAAAECBAgMJyAAOpyTqQgQIECAAAECBAgQIECAAAECBAgQmEMBAdA5rDRZJkCAAAECBAgQIECAAAECBAgQIEBgOAEB0OGcTEWAAAECBAgQIECAAAECBAgQIECAwBwKCIDOYaXJMgECBAgQIECAAAECBAgQIECAAAECwwksDTeZqQgQIECAAAECBAgQIEBg0gJf+tKX0sknnzzpxTSe/rp169KGDRuKdLdt25ZuueWWxpcx6QQPO+ywdMopp0x6MdInQIAAgSkICIBOAd0iCRAgQIAAAQIECBAg0E3gmmuuSeeff363Ub6bsMBOO+004SVIngABAgSmJaAL/LTkLZcAAQIECBAgQIAAAQIECBAgQIAAgYkLaAE6cWILIECAAAECBAgQIECAwOgCRx37pHTMc180+ozmGFpgy2U/SS9+3IOHnt6EBAgQIDCfAgKg81lvck2AAAECBAgQIECAwIILLG3YmLbfaecFL+V0i7f1+uummwFLJ0CAAIFVEdAFflWYLYQAAQIECBAgQIAAAQIECBAgQIAAgWkICIBOQ90yCRAgQIAAAQIECBAgQIAAAQIECBBYFQEB0FVhthACBAgQIECAAAECBAgQIECAAAECBKYhIAA6DXXLJECAAAECBAgQIECAAAECBAgQIEBgVQQEQFeF2UIIECBAgAABAgQIECBAgAABAgQIEJiGgADoNNQtkwABAgQIECBAgAABAgQIECBAgACBVREQAF0VZgshQIAAAQIECBAgQIAAAQIECBAgQGAaAgKg01C3TAIECBAgQIAAAQIECBAgQIAAAQIEVkVAAHRVmC2EAAECBAgQIECAAAECBAgQIECAAIFpCCxNY6GWSYAAAQIECBAgQIDAdAXe/va3p69//evTzcSYS9+8eXO69dZb08033zxmCtOd7bjjjkuHHnrodDNh6QQIECBAYA0JCICuocpWVAIECBAgQIAAAQKlwOc///l0xhlnlB+9rqLAwx72MAHQVfS2KAIECBAgoAu8dYAAAQIECBAgQIAAAQIECBAgQIAAgYUV0AJ0YatWwQgQIECAAAECBAgMJ/Cs17w57bHPvsNNbKqxBM78p/eksz/2obHmNRMBAgQIECCwMgEB0JX5mZsAAQIECBAgQIDA3AsccMjd0m0PuOPcl2OWC3DeWafPcvbkjQABAgQILLSALvALXb0KR4AAAQIECBAgQIAAAQIECBAgQGBtCwiAru36V3oCBAgQIECAAAECBAgQIECAAAECCy0gALrQ1atwBAgQIECAAAECBAgQIECAAAECBNa2gADo2q5/pSdAgAABAgQIECBAgAABAgQIECCw0AICoAtdvQpHgAABAgQIECBAgAABAgQIECBAYG0LCICu7fpXegIECBAgQIAAAQIECBAgQIAAAQILLSAAutDVq3AECBAgQIAAAQIECBAgQIAAAQIE1raAAOjarn+lJ0CAAAECBAgQIECAAAECBAgQILDQAgKgC129CkeAAAECBAgQIECAAAECBAgQIEBgbQsIgK7t+ld6AgQIECBAgAABAgQIECBAgAABAgstIAC60NWrcAQIECBAgAABAgQIECBAgAABAgTWtoAA6Nquf6UnQIAAAQIECBAgQIAAAQIECBAgsNACAqALXb0KR4AAAQIECBAgQIAAAQIECBAgQGBtCwiAru36V3oCBAgQIECAAAECBAgQIECAAAECCy0gALrQ1atwBAgQIECAAAECBAgQIECAAAECBNa2gADo2q5/pSdAgAABAgQIECBAgAABAgQIECCw0AICoAtdvQpHgAABAgQIECBAgAABAgQIECBAYG0LCICu7fpXegIECBAgQIAAAQIECBAgQIAAAQILLSAAutDVq3AECBAgQIAAAQIECBAgQIAAAQIE1raAAOjarn+lJ0CAAAECBAgQIECAAAECBAgQILDQAksLXTqFI0CAAAECBAgQIECAAAECDQhs27atgVRWP4l169alyHv5t/o5WPkS16/XdmvlilIgsLYFBEDXdv0rPQECBAgQIECAAAECBAgMIXC/+90vXXzxxUNMaZKmBT772c+mgw8+uOlkpUeAwBoScBllDVW2ohIgQIAAAQIECBAgQIAAAQIECBBYawJagK61GldeAgQIECBAgAABAgQIEFiRwL53OmhF85t5sMCVP74k3XjD9YMnNAUBAgSGEBAAHQLJJAQIECBAgAABAgQIECBAIAS2W1pKr/zQGTAmLPCmE5+Rzj/r9AkvRfIECKwVAV3g10pNKycBAgQIECBAgAABAgQIECBAgACBNSggALoGK12RCRAgQIAAAQIECBAgQIAAAQIECKwVAQHQtVLTykmAAAECBAgQIECAAAECBAgQIEBgDQoIgK7BSldkAgQIECBAgAABAgQIECBAgAABAmtFQAB0rdS0chIgQIAAAQIECBAgQIAAAQIECBBYgwICoGuw0hWZAAECBAgQIECAAAECBAgQIECAwFoREABdKzWtnAQIECBAgAABAgQIECBAgAABAgTWoIAA6BqsdEUmQIAAAQIECBAgQIAAAQIECBAgsFYEBEDXSk0rJwECBAgQIECAAAECBAgQIECAAIE1KCAAugYrXZEJECBAgAABAgQIECBAgAABAgQIrBUBAdC1UtPKSYAAAQIECBAgQIAAAQIECBAgQGANCgiArsFKV2QCBAgQIECAAAECBAgQIECAAAECa0VAAHSt1LRyEiBAgAABAgQIECBAgAABAgQIEFiDAgKga7DSFZkAAQIECBAgQIAAAQIECBAgQIDAWhEQAF0rNa2cBAgQIECAAAECBAgQIECAAAECBNaggADoGqx0RSZAgAABAgQIECBAgAABAgQIECCwVgSW1kpB56mc2223Xdp1113nKcsLn9elpf/aVBa1XmKdM0xHYKedduq5vW+//fbTyZSlpg0bNvSsFzzTFdhll1161s2mTZumm7k1vPSw7/Ub+bOf/WwNy0y36OvXr+9ZL5Gz2NcZpiOw44479qybHXbYYTqZstQUx/y99mXBE9uUYToCO++8c8+62bx583QyZalp48aNPevlxhtvJDRFgX77silma6qLFgCdKn/3ha9bt6748e0+1rfTECgPdspA6DTyMMllxjpnmI5ABJ97rVcC09Opk1iq/fD07ActObaXXttMua8elIbxzQuEfa96sS9r3nuUFHvVS6Th938UyWantc0069lUaoN+/20zTUmPnk6/Y2a//6N7NjVHv33Zrbfe2tRipDOGQL/f/zGSW4hZBEBnsBpvueWWdM0118xgztZuluJKfFxBueKKKxYSIdY5w3QErr766p7r1bXXXjudTFlquummm3rWC57pClx55ZWp1wH1DTfcMN3MreGlh32v38irrrpqDctMt+jbtm3rWS+Rs9jXGaYjEMf6vbYZ5wHTqZNY6s0339yzXmJ8r9+fGGeYrMCWLVt61s31118/2YVLvafA1q1be9aLFqA92VZlRK/fmFVZ+AQXsu+++46dujb8Y9OZkQABAgQIECBAgAABAgQIECBAgACBWRcQAJ31GpI/AgQIECBAgAABAgQIECBAgAABAgTGFhAAHZvOjAQIECBAgAABAgQIECBAgAABAgQIzLqAAOis15D8ESBAgAABAgQIECBAgAABAgQIECAwtoAA6Nh0ZiRAgAABAgQIECBAgAABAgQIECBAYNYFBEBnvYbkjwABAgQIECBAgAABAgQIECBAgACBsQUEQMemMyMBAgQIECBAgAABAgQIECBAgAABArMuIAA66zUkfwQIECBAgAABAgQIECBAgAABAgQIjC0gADo2nRkJECBAgAABAgQIECBAgAABAgQIEJh1AQHQWa8h+SNAgAABAgQIECBAgAABAgQIECBAYGwBAdCx6cxIgAABAgQIECBAgAABAgQIECBAgMCsCwiAznoNyR8BAgQIECBAgAABAgQIECBAgAABAmMLCICOTWdGAgQIECBAgAABAgQIECBAgAABAgRmXUAAdNZrSP4IECBAgAABAgQIECBAgAABAgQIEBhbQAB0bDozEiBAgAABAgQIECBAgAABAgQIECAw6wICoLNeQ/JHgAABAgQIECBAgAABAgQIECBAgMDYAgKgY9OZkQABAgQIECBAgAABAgQIECBAgACBWRcQAJ31GpI/AgQIECBAgAABAgQIECBAgAABAgTGFhAAHZvOjAQIECBAgAABAgQIECBAgAABAgQIzLqAAOis15D8ESBAgAABAgQIECBAgAABAgQIECAwtoAA6Nh0ZiRAgAABAgQIECBAgAABAgQIECBAYNYFBEBnvYbkjwABAgQIECBAgAABAgQIECBAgACBsQUEQMemMyMBAgQIECBAgAABAgQIECBAgAABArMuIAA66zUkfwQIECBAgAABAgQIECBAgAABAgQIjC0gADo2nRkJECBAgAABAgQIECBAgAABAgQIEJh1AQHQWa8h+SNAgAABAgQIECBAgAABAgQIECBAYGwBAdCx6cxIgAABAgQIECBAgAABAgQIECBAgMCsCwiAznoNyR8BAgQIECBAgAABAgQIECBAgAABAmMLCICOTWdGAgQIECBAgAABAgQIECBAgAABAgRmXUAAdNZrSP4IECBAgAABAgQIECBAgAABAgQIEBhbQAB0bDozEiBAgAABAgQIECBAgAABAgQIECAw6wICoLNeQ/JHgAABAgQIECBAgAABAgQIECBAgMDYAgKgY9OZkQABAgQIECBAgAABAgQIECBAgACBWRcQAJ31GpI/AgQIECBAgAABAgQIECBAgAABAgTGFhAAHZvOjAQIECBAgAABAgQIECBAgAABAgQIzLqAAOis15D8ESBAgAABAgQIECBAgAABAgQIECAwtoAA6Nh0ZiRAgAABAgQIECBAgAABAgQIECBAYNYFBEBnvYbkjwABAgQIECBAgAABAgQIECBAgACBsQUEQMemMyMBAgQIECBAgAABAgQIECBAgAABArMuIAA66zUkfwQIECBAgAABAgQIECBAgAABAgQIjC0gADo2nRkJECBAgAABAgQIECBAgAABAgQIEJh1AQHQWa8h+SNAgAABAgQIECBAgAABAgQIECBAYGwBAdCx6cxIgAABAgQIECBAgAABAgQIECBAgMCsCwiAznoNyR8BAgQIECBAgAABAgQIECBAgAABAmMLCICOTWdGAgQIECBAgAABAgQIECBAgAABAgRmXUAAdNZrSP4IECBAgAABAgQIECBAgAABAgQIEBhbQAB0bDozEiBAgAABAgQIECBAgAABAgQIECAw6wICoLNeQ/JHgAABAgQIECBAgAABAgQIECBAgMDYAgKgY9OZkQABAgQIECBAgAABAgQIECBAgACBWRcQAJ31GpI/AgQIECBAgAABAgQIECBAgAABAgTGFhAAHZvOjAQIECBAgAABAgQIECBAgAABAgQIzLqAAOis15D8ESBAgAABAgQIECBAgAABAgQIECAwtoAA6Nh0ZiRAgAABAgQIECBAgAABAgQIECBAYNYFBEBnvYbkjwABAgQIECBAgAABAgQIECBAgACBsQUEQMemMyMBAgQIECBAgAABAgQIECBAgAABArMuIAA66zUkfwQIECBAgAABAgQIECBAgAABAgQIjC0gADo2nRkJECBAgAABAgQIECBAgAABAgQIEJh1AQHQWa8h+SNAgAABAgQIECBAgAABAgQIECBAYGwBAdCx6cxIgAABAgQIECBAgAABAgQIECBAgMCsCwiAznoNyR8BAgQIECBAgAABAgQIECBAgAABAmMLCICOTWdGAgQIECBAgAABAgQIECBAgAABAgRmXUAAdNZrSP4IECBAgAABAgQIECBAgAABAgQIEBhbQAB0bDozEiBAgAABAgQIECBAgAABAgQIECAw6wJLk8zgt771rfS5z30u/fCHP0yXXXZZ8bdx48a07777Fn/7779/OvLII4v3k8yHtAkQIECAAAECBAgQIECAAAECBAgQWJsCjQdAzznnnPTmN785nX766emSSy4ZqLpu3br0y7/8y+mRj3xkOvbYY9Nd7nKXgfOYgAABAgQIECBAgAABAgQIECBAgAABAsMINNIFvtVqpY9+9KPpiCOOSIcffnh697vf3TX4uWHDhrS01B5zjXm/+MUvppNPPjnd7W53S7/1W7+VzjvvvGHybhoCBAgQIECAAAECBAgQIECAAAECBAj0FWiPRvadtPvICy64IB133HFFELOcIrq4R4vOX/iFX0gHHHBAuv3tb1+87rPPPilafF599dXp8ssvL7rGf+ELX0if//zn09lnn522bNmSPvShDxV/j3jEI9Kb3vSmdKc73alM1isBAgQIECBAgAABAgQIECBAgAABAgRGEhg7AHrTTTelV77ylekv/uIv0s0335z222+/dMwxxxR/97///dP69b0bl+62224p/g466KDiHqCR423btqVPf/r/s3cnYHKUdf7Af8lM7nBGIFwhQMItAkFuDBCFsEgUFFQQkVON4IoiisgGAUFQQNBdkcOVFZEjCioQUG4QBDkUnoQjhNOwGwIkEHJf/33rb/dmwvRMpromXZl86nk6U11V71u//rzT05Pv1HF7XHnlldnRpDfffHPcc889cf7558cXv/jFLDjt0CuzMQECBAgQIECAAAECBAgQIECAAAECK71A7gB0v/32ywLKwYMHx+mnnx6f+9zn3nN6e0d0U2C6//77Z4/XX389fvrTn8YPf/jDGD16dKSbKV188cUd6c62BAgQIECAAAECBAgQIECAAAECBAgQiNqHabaD8+6778Z5552XhZNHH310XeHn0rtae+21Y8yYMTFp0qQsAE2BqIkAAQIECBAgQIAAAQIECBAgQIAAAQIdFch9BGg6Pb1fv34d3V+Htk9B6L//+7/HzJkzO9TOxgQIECBAgAABAgQIECBAgAABAgQIEEgCuY8A7ezwc8nhWZ77WnK/5gkQIECAAAECBAgQIECAAAECBAgQWLEFcgegK/bLVj0BAgQIECBAgAABAgQIECBAgAABAiuDQO5T4NvDee211+LPf/5zdh3PN998s73Ns/X77rtvfOQjH1mmbW1EgAABAgQIECBAgAABAgQIECBAgACB9gQ6JQA955xz4nvf+17MmjWrvf23WJ9OdReAtiDxhAABAgQIECBAgAABAgQIECBAgACBOgQKD0B/85vfxGmnnVZHSZp2VYGnn346vvjFL66QL6979+7R1NQU8+fPXyHrHzp0aFxxxRUrZO2KJkCAAAECBAgQIECAAAECBAjUI1B4AHreeedl9aSw6Nxzz41Pf/rTMWDAgOjRo0e7daY2pq4rMGfOnJg4cWLXfYElfmU9e/YscXVKI0CAAAECBAgQIECAAAECBAh0nkDhAWg6yi9Np5xySnzjG9/ovMr1TIAAAQIECBAgQIAAAQIECBAgQIAAgXYECg1AFy5cWN2da3lWKcy0IrDrv3w8jjnzglbWWFSUwLy5c2L07lsX1Z1+CBAgQIAAAQIECBAgQIAAAQIrpEChAWg6hX3PPfeMcePGxbRp01ZIEEUvJ4Fu3aK7Sx50Knb37i4p0anAOidAgAABAgQIECBAgAABAgRWCIHuRVe57777Zl1ef/31RXetPwIECBAgQIAAAQIECBAgQIAAAQIECHRIoPAA9MQTT4xPfOITcd1118WZZ54Zc+fO7VBBNiZAgAABAgQIECBAgAABAgQIECBAgEBRAoWeAp+KSqfB//rXv45/+Zd/iTFjxsRll10W22+/fWy00UbRu3fvNutOR49WjiBtc0MrCRAgQIAAAQIECBAgQIAAAQIECBAgsAwChQegaZ9/+tOf4rHHHst2P3ny5EiPZZn69+8vAF0WKNsQIECAAAECBAgQIECAAAECBAgQILBMAoUHoDfeeGN2CvzixYuXqQAbESBAgAABAgQIECBAgAABAgQIECBAoLMECg9Af/vb30YKP9Pp7ukaoB//+Mdj3XXXjR49erT7GpqbCy+n3X3agAABAgQIECBAgAABAgQIECBAgACBritQeOJ4zz33ZFpnnHFGfOMb3+i6cl4ZAQIECBAgQIAAAQIECBAgQIAAAQKlFyj0LvCLFi2K6dOnZy969913L/2LVyABAgQIECBAgAABAgQIECBAgAABAl1boNAAtHv37rHHHntkYhMmTOjacl4dAQIECBAgQIAAAQIECBAgQIAAAQKlFyg0AE2vdsSIEdmLTjdDMhEgQIAAAQIECBAgQIAAAQIECBAgQKCRAoUHoCeeeGIWgt52221x6KGHxsyZMxv5+uybAAECBAgQIECAAAECBAgQIECAAIGVWKDwmyA9//zz8fWvfz3Gjx8fN9xwQ6SbIqXrgW6wwQax6qqrRjpNvta0zz77xN57711rteUECBAgQIAAAQIECBAgQIAAAQIECBDokEDhAegpp5wSt956a7WIqVOnxk033VR93tZMc3OzALQtIOsIECBAgAABAgQIECBAgAABAgQIEOiQQO3DMTvUjY0JECBAgAABAgQIECBAgAABAgQIECBQPoHCjwC97rrrYsGCBbleae/evXO104gAAQIECBAgQIAAAQIECBAgQIAAAQKtCRQegPbv37+1/SyXZbNmzYrLL7+8zX0dcMABMWTIkBbbzJ07N8aOHRuPPvpoTJs2LYYOHRrbbbddjBw5MpqamlpsW3mSp02lra8ECBAgQIAAAQIECBAgQIAAAQIECCwfgcID0Lxlz549O5555pnYfvvt83YR6QZMKchsa0rB5pIB6PTp02P06NHx6quvZs3WXHPNSHewT48HH3wwxowZEz179mzRZZ42LTrwhAABAgQIECBAgAABAgQIECBAgACB5SJQeAD6k5/8JI4//vj3hIZtvZqHHnooPv/5z8dnPvOZugLQiRMnZrsZNmxYpDvKtzalozuXnM4666ws/Nx5553j9NNPj9VWWy0mT54cp512Wtx3331xySWXxMknn7xkk8jTpkUHnhAgQIAAAQIECBAgQIAAAQIECBAgsFwECr8J0rhx4+LQQw+N+fPnt/sC5syZE9/4xjdijz32iOeeey66devWbpu2NqgEoCn8HDVqVKuP9dZbr9rFhAkT4pFHHok+ffrE2WefnYWfaeX6668fF154YXb6e3o9M2bMqKtNtbEZAgQIECBAgAABAgQIECBAgAABAgSWq0DhAWiq/ne/+10cfvjhsXDhwpov5uGHH86O9vzhD38YixYtyrZbMpys2bCNFekU+DRtvvnmbWz1f6vuueee7Mnw4cNj6RswpVPhd9ppp5g3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vgK5A9DlW2b7e2tqaorzzz8/O3LzmmuuiXTUZ3qkacMNN4yvfOUrrV7n80Mf+lBcdNFFWQCagtJKWJqODD3ppJNi2223fc/O87R5TycWECBAgAABAgQIECBAgAABAgQIECDQ6QK5A9DLLrssDj/88OjXr1+nFjl58uS4995747DDDmt3P717985OcT/yyCPjtddei+nTp8cmm2wS/fv3b7Pt9ttvn50in055f/XVVyPd6GjgwIHRvXvtKwTkadNmEVYSIECAAAECBAgQIECAAAECBAgQIFC4QO2Er51d/fCHP8xOF//5z38eCxcubGfrjq9O1xb99re/ne3jt7/9bYc6aG5ujkGDBmVHb7YXfi7Z8YABA7IbHq233npthp/1tlmyvXkCBAgQIECAAAECBAgQIECAAAECBDpPIHcAOmbMmJg7d252xOWWW24Zl19+eUybNq3uSp9++uk4+eSTsyM3zz333OxozBNPPLHufnVAgAABAgQIECBAgAABAgQIECBAgMDKJ5A7AE2nv0+YMCE++clPZndRP/7442OdddaJ/fffP9JRoel08mWZ0tGj6cZFl1xySey+++6x1VZbxQUXXJC1TzcoSjckGj58+LJ0ZRsCBAgQIECAAAECBAgQIECAAAECBAi0EMh9DdDUSwo8b7jhhrjpppsiHRH65JNPxm233ZY9jjnmmFhjjTWyU9HTTYgqj3QX9TfeeCN7/OMf/4hHHnkkZsyY0aKokSNHxumnnx677bZbi+WeECBAgAABAgQIECBAgAABAgQIECBAoCMCdQWglR19/OMfj/T44x//GOnaoH/605+yVemU+PT4+9//Xtm05td0A6MDDjggTj311Bg2bFjN7awgQIAAAQIECBAgQIAAAQIECBAgQIDAsgoUEoBWdrbvvvtGekycODELQe+666647777YurUqZVNql979eoV66+/fuy1115x4IEHxkc+8pFOv6N8dedmCBAgQIAAAQIECBAgQIAAAQIECBBYKQQKDUArYkOHDs3u3j569OhsUbpZUjrtPQWhPXv2jHXXXTc7Pb6yva8ECBAgQIAAAQIECBAgQIAAAQIECBDoDIFOCUCXLrRytGc64tNEgAABAgQIECBAgAABAgQIECBAgACB5SWQ+y7wy6tA+yFAgAABAgQIECBAgAABAgQIECBAgEBeAQFoXjntCBAgQIAAAQIECBAgQIAAAQIECBAovYAAtPRDpEACBAgQIECAAAECBAgQIECAAAECBPIKCEDzymlHgAABAgQIECBAgAABAgQIECBAgEDpBQSgpR8iBRIgQIAAAQIECBAgQIAAAQIECBAgkFdAAJpXTjsCBAgQIECAAAECBAgQIECAAAECBEovIAAt/RApkAABAgQIECBAgAABAgQIECBAgACBvAIC0Lxy2hEgQIAAAQIECBAgQIAAAQIECBAgUHqB5RqAzpw5M959993SoyiQAAECBAgQIECAAAECBAgQIECAAIGuIdCpAejUqVPj5JNPjuHDh8d6660X/fv3jzFjxmRyL774Yuy5554xduzYWLRoUdfQ9CoIECBAgAABAgQIECBAgAABAgQIECiVQHNnVLN48eK4+OKL47vf/W5Mnz691V289NJL8cADD2SPww47LH7xi19Ejx49Wt3WQgIECBAgQIAAAQIECBAgQIAAAQIECOQR6JQjQH/0ox/FSSedlIWfzc3Nsf3228eQIUNa1LdgwYJq4HnNNdfEl770pRbrPSFAgAABAgQIECBAgAABAgQIECBAgEC9AoUHoE899VSceuqpWV0HHHBATJo0KR5//PFI80tOH/nIR7J16TT4NKUjQJ999tklNzFPgAABAgQIECBAgAABAgQIECBAgACBugQKD0AvuuiimDt3bnbU5w033BCDBg2qWeCGG24Yt99+e6y55pqxcOHCuPLKK2tuawUBAgQIECBAgAABAgQIECBAgAABAgQ6KlB4APq3v/0tqyEdBdqnT59260nbVI4OnThxYrvb24AAAQIECBAgQIAAAQIECBAgQIAAAQLLKlBoxtgVVQAAQABJREFUAJqO4hw/fny272HDhi1rDTFy5Mhs21deeWWZ29iQAAECBAgQIECAAAECBAgQIECAAAEC7QkUGoA2NTVF//79s32+/fbb7e27un7q1KnZ/HrrrVddZoYAAQIECBAgQIAAAQIECBAgQIAAAQL1ChQagKZiPvCBD2Q13XnnnctcW7oOaJq22WabZW5jQwIECBAgQIAAAQIECBAgQIAAAQIECLQnUHgAuvPOO2f7PPPMM+P5559vb//xn//5nzFu3Lhsu46cNt9uxzYgQIAAAQIECBAgQIAAAQIECBAgQGClFyg8AP3mN78Z6e7uM2bMiB133DEuvfTSmDJlynugX3755Tj22GPjmGOOydbtsccecfDBB79nOwsIECBAgAABAgQIECBAgAABAgQIECCQV6DwAHT11VePq666Krp37x7pOqBf+tKXYuDAgVkQmor89a9/HWuttVYMHjw4rrzyyli8eHH07ds3OxI0tTERIECAAAECBAgQIECAAAECBAgQIECgKIFOSRz33nvv+Mtf/hK77LJLtc65c+dm8//93/8db7zxRnX5iBEj4tFHH40hQ4ZUl5khQIAAAQIECBAgQIAAAQIECBAgQIBAEQLNRXTSWh8f/OAH48EHH4yxY8dmXydOnBjpkY743GyzzWLo0KGRgtJRo0a11twyAgQIECBAgAABAgQIECBAgAABAgQI1C3QaQFoqqxbt25xyCGHZI+6K9UBAQIECBAgQIAAAQIECBAgQIAAAQIEOijQKafAL1nDnDlzlnxanX/44Ydj1qxZ1edmCBAgQIAAAQIECBAgQIAAAQIECBAgULRApwWg999/fxx44IGxww47tFrzZz/72Xjf+94Xhx9+eLz11lutbmMhAQIECBAgQIAAAQIECBAgQIAAAQIE6hHolAD05z//eaSbG918883x3HPPxbx581rUuGjRonj55Zdj9uzZcc0118SwYcNi/PjxLbbxhAABAgQIECBAgAABAgQIECBAgAABAvUKFB6AphsdfeELX4j58+dnte23337vCUDTihtvvDGOP/746N69e7z00ktx5JFHRgpGTQQIECBAgAABAgQIECBAgAABAgQIEChKoPAA9Oyzz44FCxbEOuusE3feeWfccsst0b9//xb1ptDzgAMOiJ/97Gdxxx13RHNzczz22GPxq1/9qsV2nhAgQIAAAQIECBAgQIAAAQIECBAgQKAegcID0AcffDCr56ijjop99tmn3dr23nvvOPbYY7Pt7r333na3twEBAgQIECBAgAABAgQIECBAgAABAgSWVaDQAHThwoXZ6exp55/+9KeXtYbYc889s22ffvrpZW5jQwIECBAgQIAAAQIECBAgQIAAAQIECLQnUGgA2q1bt+yanmmn6TT4ZZ3mzJmTbdq7d+9lbWI7AgQIECBAgAABAgQIECBAgAABAgQItCtQaACaru05aNCgbKf33XdfuzuvbPDnP/85m912220ri3wlQIAAAQIECBAgQIAAAQIECBAgQIBA3QKFBqCpmo997GNZUWPGjInnnnuu3QLTTZB+8YtfZNsNGzas3e1tQIAAAQIECBAgQIAAAQIECBAgQIAAgWUVKDwA/eIXvxjpVPYZM2bELrvsEumu8K+//nqLehYvXpxdK/SrX/1qjBo1KhYtWhQ77rhjh64b2qJDTwgQIECAAAECBAgQIECAAAECBAgQINCKQOEB6JAhQ+I//uM/sl1NmzYtTj/99FhnnXWif//+seWWW8amm24affr0iY033jguvvjimD17dvb8l7/8ZTQ3N7dSokUECBAgQIAAAQIECBAgQIAAAQIECBDIJ1B4AJrKOOqoo+Kmm26K9ddfv1rVzJkz45lnnokXXngh5s6dW13+0Y9+NP72t7/FFltsUV1mhgABAgQIECBAgAABAgQIECBAgAABAkUIdNohl+laoPvtt1+ka3zecsstWfA5ZcqU6Nu3b6SjRNNjzz33jL333ruI16EPAgQIECBAgAABAgQIECBAgAABAgQIvEeg0wLQtKd0LdB0hGd6mAgQIECAAAECBAgQIECAAAECBAgQILC8BTrlFPjl/SLsjwABAgQIECBAgAABAgQIECBAgAABAq0JdOoRoOnu788++2zMmjUrFixY0Nr+WyzbbLPNYujQoS2WeUKAAAECBAgQIECAAAECBAgQIECAAIG8Ap0SgKbQ8zvf+U52I6RlCT4rxY8ZMybOOOOMylNfCRAgQIAAAQIECBAgQIAAAQIECBAgUJdA4QHojBkzYtSoUfHcc8/VVZjGBAgQIECAAAECBAgQIECAAAECBAgQqFeg8AD0zDPPrIaf6XT2z3zmMzF48OAYOHBgdOvWrc16053hTQQIECBAgAABAgQIECBAgAABAgQIEChKoPAA9IEHHshq23777eOOO+6INddcs6ha9UOAAAECBAgQIECAAAECBAgQIECAAIEOCRR6F/iFCxfG3//+96yAo48+WvjZoaGwMQECBAgQIECAAAECBAgQIECAAAECRQsUGoA2NTVFv379shrTEaAmAgQIECBAgAABAgQIECBAgAABAgQINFKg0AA0vZBdd901ez0vvfRS9tU/BAgQIECAAAECBAgQIECAAAECBAgQaJRA4QHoPvvsk72WK664olGvyX4JECBAgAABAgQIECBAgAABAgQIECCQCRQegJ544olx8MEHxz333BNf+cpXYsaMGagJECBAgAABAgQIECBAgAABAgQIECDQEIHC7wI/fvz4OO644+KRRx6JH//4x3HttdfGsGHDYqONNoq11lqrzReZjh7de++929zGSgIECBAgQIAAAQIECBAgQIAAAQIECCyrQOEB6Kmnnhq33nprdf9Tp06N2267rfq8rZnm5mYBaFtA1hEgQIAAAQIECBAgQIAAAQIECBAg0CGBwk+B79DebUyAAAECBAgQIECAAAECBAgQIECAAIFOFCj8CNDrrrsuFixYkKvk3r1752qnEQECBAgQIECAAAECBAgQIECAAAECBFoTKDwA7d+/f2v7sYwAAQIECBAgQIAAAQIECBAgQIAAAQLLXaBUp8AvXrx4uQPYIQECBAgQIECAAAECBAgQIECAAAECXVeg8CNAl6R66aWX4n/+539i3rx5sWjRouqqFHSm0+QXLlwYM2fOjClTpsQtt9wSu+22W5x22mnV7cwQIECAAAECBAgQIECAAAECBAgQIECgHoFOCUD/8pe/xLe+9a249957O1TbBz/4wQ5tb2MCBAgQIECAAAECBAgQIECAAAECBAi0JVB4ADpt2rQ46KCDsiM/29rx0uvWW2+92GKLLZZe7DkBAgQIECBAgAABAgQIECBAgAABAgRyCxQegJ5zzjnV8HPEiBExatSo6NOnTxx//PHRq1evuOKKK7LT3l9++eW4/vrrY9KkSbHJJpvEM888Ez169Mj9QjQkQIAAAQIECBAgQIAAAQIECBAgQIDA0gKFB6CPPfZYto999903br/99ur+zjvvvCzs3GyzzWKnnXbKlp9yyikxcuTIePjhh+OCCy7ITpuvNjBDgAABAgQIECBAgAABAgQIECBAgACBOgUKvwv8xIkTs5L+9V//tUVpu+66a/b87rvvri5fffXV44477ohNN900zjzzzHjxxRer68wQIECAAAECBAgQIECAAAECBAgQIECgXoFCA9D58+fH5MmTs5qGDh3aorbNN988e/7kk0+2WN6/f//Yf//9Y/bs2XHjjTe2WOcJAQIECBAgQIAAAQIECBAgQIAAAQIE6hEoNABN1/AcMGBAVk9zc8uz62sFoGnj4cOHZ22eeuqp7Kt/CBAgQIAAAQIECBAgQIAAAQIECBAgUIRAoQFoKqhyJ/elT2ffcssts3rTzY7mzZvXova+fftmz8ePH99iuScECBAgQIAAAQIECBAgQIAAAQIECBCoR6DTAtBLL720RV3pCNB0VOiCBQvivvvua7Hu5ptvzp6vssoqLZZ7QoAAAQIECBAgQIAAAQIECBAgQIAAgXoECg9AjzjiiOjWrVvccMMN8clPfjIeffTRrL50evzuu++ezY8ePTpee+21WLx4cfzhD3+IsWPHZsuHDBlSz2vRlgABAgQIECBAgAABAgQIECBAgAABAi0ECg9AP/ShD8WJJ56Y7eQ3v/lNjBo1qrrDr33ta9l8ulP8hhtuGOuuu262furUqdnyFJ6aCBAgQIAAAQIECBAgQIAAAQIECBAgUJRA4QFoKuzcc8+NE044IdId3jfddNNqrQceeGB8+ctfzp4vWrQopkyZUl133HHHxR577FF9boYAAQIECBAgQIAAAQIECBAgQIAAAQL1CrS8VXu9vf2zfbqp0Y9//OP43ve+F3/729+qvaZT43/yk5/EsGHD4qabboonnngi0mnvhx12WBx77LHV7cwQIECAAAECBAgQIECAAAECBAgQIECgCIFOCUArha266qqRTolfejrqqKMiPUwECBAgQIAAAQIECBAgQIAAAQIECBDoTIFOOQW+MwvWNwECBAgQIECAAAECBAgQIECAAAECBJZVoPAA9LLLLouvfvWrMWHChGWtIc4666zYbbfdsmuHLnMjGxIgQIAAAQIECBAgQIAAAQIECBAgQKAdgcID0N/97ndx8cUXx4svvtjOrv9v9T333BMPPfRQh0LT/2ttjgABAgQIECBAgAABAgQIECBAgAABAq0LdOo1QFvf5f8tXbhwYUycODH+/ve/ZwvTzZNMBAgQIECAAAECBAgQIECAAAECBAgQKEqgrgD0gAMOiDvvvLNFLfPnz8+eH3TQQdG9e9sHmKZtFy1aVG2/4447VufNECBAgAABAgQIECBAgAABAgQIECBAoF6BugLQCy64ILbddtuohJ5LFtPasiXXLz2/zTbbxMc//vGlF3tOgAABAgQIECBAgAABAgQIECBAgACB3AJ1BaBbbLFF/PSnP42//vWv1QLGjRsXr7zySuy///4xaNCg6vLWZnr06BH9+vWLjTfeOA499NBYY401WtvMMgIECBAgQIAAAQIECBAgQIAAAQIECOQSqCsATXs85phjskdl7+m0+BSAfvnLX440byJAgAABAgQIECBAgAABAgQIECBAgECjBOoOQJcu/IgjjojddtstNt9886VXeU6AAAECBAgQIECAAAECBAgQIECAAIHlKlB4APrpT3+63RcwefLkuP3222Px4sVx4IEHxtprr91uGxsQIECAAAECBAgQIECAAAECBAgQIECgowJt36a9o739c/sFCxbETTfdFB/72MfirrvuatHLGWecERtssEF22vyxxx4b6667bnzuc5/LwtAWG3pCgAABAgQIECBAgAABAgQIECBAgACBOgU6JQA99dRT46CDDorf//738eyzz1ZLvPnmm+PMM8+sPk8zixYtil/+8pfx3e9+t8VyTwgQIECAAAECBAgQIECAAAECBAgQIFCvQOEB6L333hsXXnhhVldzc3P07du3WuPZZ5+dHenZ1NQUJ510Ujz22GNxwgknZOtTMJqemwgQIECAAAECBAgQIECAAAECBAgQIFCUQOHXAL3yyiuzozq32Wab+M1vfhObbbZZVuvLL78cDz/8cDZ/8MEHV0PSHXbYIZ5++um4884744EHHohhw4YV9dr0Q4AAAQIECBAgQIAAAQIECBAgQIDASi5QeAA6YcKEjPTII4+shp9pwa233lql/sQnPlGdTzOHHHJIFoA+/vjjLZavzE+6devW5V5+V3xNK9IgteXf1roV6TWuiLUm+1r+tZaviK9zRayZfzlHra33TDkrXnmqqvWeqbV85ZFp7Cvl31j/Wnv3s6yWTOOXe880fgxaq8B7pjWVciyr9Z6ptbwcVXf9Kvi/d4wLDUDTXd2feeaZbC/77bdfi72NGzcue55Of993331brEs3QkrT+PHjWyxfWZ/06NEjVl999S738gcMGNDlXtOK8oLS99TAgQNrlpvWmxojkN4XtcZmtdVWa0xR9hp9+vSpOS6Jxy8UjfsmWWeddWp+Rvbv379xha3ke15llVVqvmfmzZu3kus07uWn37trfcakqnr37t244lbyPa+xxho1x2bNNddcyXUa9/J79epVc1xSVekSb6bGCKy11lo1x2bVVVdtTFH2Gv369as5LnPnziXUIIH0f5W2Pv8bVFbDd1voT/B0Q6PKL7npF+HKlJbdfffd2dMPfvCDkT7wl5xef/317GlXDP2WfJ3LOr9w4cKYPn36sm6+wmw3Y8aMFabWrlboggUL2vyeSutNjRFI74ta7/dZs2Y1pih7zT7Lao1L4kl/8DM1RuDtt9+uueM5c+bUXGdF5wrMnj275s+ytsasc6vSe/rdvK2fZfPnz4fUIIGZM2fWHJt33323QVXZbXpPtPWeSf9PMzVG4J133qk5NukzyNQYgRRy1nrPCEAbMyZpr+n/KrXGpXFVFbPnenLDQgPQ9FfmjTbaKJ5//vnsSNDBgwdnrzDdGKnyQb70kaFpg3T9zzQNGjQo+7qy/5N+We2KP8T9AGzcd3b6AdjW91T6njM1RiC9L2qNTeUPSo2pbOXea/oPTq1xWbllGv/q07j07Nmz1UL8MadVluWyMNnXes8IppfLELS6k/Y+/4U5rbItl4U+/5cLc4d30t7/w/wBtMOkhTVInyW1Pmf8Macw5g531Nbnv///d5iz0Aa13i+F7qQBndUTgBZ+F/hddtklIzjjjDNi0qRJkY5gOvXUU6sshx56aHU+/RBLd4y/7rrrsmV77LFHdZ0ZAgQIECBAgAABAgQIECBAgAABAgQI1CtQ6BGgqZiTTjoprr766uyO71tuuWWk66hUjv4cOXJkbLXVVlnNf/7znyOFoa+99lr2fMMNN4zPfvaz2bx/CBAgQIAAAQIECBAgQIAAAQIECBAgUIRA4UeA7rDDDvGLX/wi0k1V0qHolfBz6623jmuvvbZac7oeVCX8TBc0TutqndJWbWSGAAECBAgQIECAAAECBAgQIECAAAECHRAo/AjQtO8jjzwyhg0bFrfeemu8+OKLsddee0U6+nPJOxpvscUWke7k+olPfCJOOeWU7NqhHajbpgQIECBAgAABAgQIECBAgAABAgQIEGhXoFMC0LTXbbbZJnvUqmDjjTfOjgDt3r3wg1Br7dJyAgQIECBAgAABAgQIECBAgAABAgRWMoFOC0Dbc+zWrVukh4kAAQIECBAgQIAAAQIECBAgQIAAAQKdJeDwy86S1S8BAgQIECBAgAABAgQIECBAgAABAg0XyH0E6F133RV33HFH9gL222+/GD58eDZ/1VVXxbPPPpvrhY0YMSLSw0SAAAECBAgQIECAAAECBAgQIECAAIEiBHIHoPfff3+ce+65WQ3p5kaVAPT666/Pbn6Up7hevXoJQPPAaUOAAAECBAgQIECAAAECBAgQIECAQKsCToFvlcVCAgQIECBAgAABAgQIECBAgAABAgS6gkDuI0BPPfXU+NrXvpYZpCM3K9PYsWNjwYIFlacd+rpkPx1qaGMCBAgQIECAAAECBAgQIECAAAECBAi0IpA7AO3Zs2ekx9JTnz59ll7kOQECBAgQIECAAAECBAgQIECAAAECBBoi4BT4hrDbKQECBAgQIECAAAECBAgQIECAAAECy0Mg9xGgtYpbuHBh/PWvf41HHnkkpk6dGm+88Uasssoqsckmm8TGG2+cfU3zTU1NtbqwnAABAgQIECBAgAABAgQIECBAgAABAoUIFBaATp48Oc4+++y45ppr4p133mmzuMGDB8fJJ58cRx99dDhlvk0qKwkQIECAAAECBAgQIECAAAECBAgQqEOgkFPgL7/88hgyZEhceuml7YafqdaXXnopTjjhhNhoo43it7/9bR3la0qAAAECBAgQIECAAAECBAgQIECAAIHaAnUfAfqDH/wgTjnllOoe0o2RPvrRj8Yuu+wSAwcOjHXWWScLRSdNmhTp8fzzz8f999+f3Sk+nSL/qU99Kn7961/HJz/5yWofZggQIECAAAECBAgQIECAAAECBAgQIFCEQF0B6Kuvvhrf+c53qnV89atfzZ4PGDCguqy1mQkTJsRJJ50Uf/zjH7Mg9DOf+Uxsvvnm8f73v7+1zS0jQIAAAQIECBAgQIAAAQIECBAgQIBALoG6ToE/77zzYt68edmOf/azn8VFF10U7YWfaeOtttoqbr/99vjJT36StV2wYEF1PlvgHwIECBAgQIAAAQIECBAgQIAAAQIECBQgkDsAff311+PKK6/MShg1alQcf/zxHS5n9OjRseuuu2btrr766mW6fmiHd6IBAQIECBAgQIAAAQIECBAgQIAAAQIrrUDuAPThhx+OOXPmZHBf+MIXcgF269atev3QWbNmxdNPP52rH40IECBAgAABAgQIECBAgAABAgQIECDQmkDuAPSVV16p9rfDDjtU5zs6s+OOO1abTJ48uTpvhgABAgQIECBAgAABAgQIECBAgAABAvUK5A5AZ86cWd336quvXp3v6Mxaa61VbSIArVKYIUCAAAECBAgQIECAAAECBAgQIECgAIHcAWjl9Pempqbo3bt37lJ69eoVzc3//2b0b731Vu5+NCRAgAABAgQIECBAgAABAgQIECBAgMDSArkD0MWLF2d9pet41jsV0Ue9NWhPgAABAgQIECBAgAABAgQIECBAgEDXE8gdgHY9Cq+IAAECBAgQIECAAAECBAgQIECAAIGuJiAA7Woj6vUQIECAAAECBAgQIECAAAECBAgQIFAV+P8X36w+zTcza9asfA21IkCAAAECBAgQIECAAAECBAgQIECAQCcK1B2ALliwIPr169eJJeqaAAECBAgQIECAAAECBAgQIECAAAEC+QScAp/PTSsCBAgQIECAAAECBAgQIECAAAECBFYAgdxHgG6yySYxYsSIQl/ixhtvXGh/OiNAgAABAgQIECBAgAABAgQIECBAYOUWyB2AHnHEEZEeJgIECBAgQIAAAQIECBAgQIAAAQIECJRVwCnwZR0ZdREgQIAAAQIECBAgQIAAAQIECBAgULeAALRuQh0QIECAAAECBAgQIECAAAECBAgQIFBWAQFoWUdGXQQIECBAgAABAgQIECBAgAABAgQI1C0gAK2bUAcECBAgQIAAAQIECBAgQIAAAQIECJRVQABa1pFRFwECBAgQIECAAAECBAgQIECAAAECdQsIQOsm1AEBAgQIECBAgAABAgQIECBAgAABAmUVEICWdWTURYAAAQIECBAgQIAAAQIECBAgQIBA3QIC0LoJdUCAAAECBAgQIECAAAECBAgQIECAQFkFBKBlHRl1ESBAgAABAgQIECBAgAABAgQIECBQt4AAtG5CHRAgQIAAAQIECBAgQIAAAQIECBAgUFYBAWhZR0ZdBAgQIECAAAECBAgQIECAAAECBAjULSAArZtQBwQIECBAgAABAgQIECBAgAABAgQIlFVAAFrWkVEXAQIECBAgQIAAAQIECBAgQIAAAQJ1CwhA6ybUAQECBAgQIECAAAECBAgQIECAAAECZRUQgJZ1ZNRFgAABAgQIECBAgAABAgQIECBAgEDdAgLQugl1QIAAAQIECBAgQIAAAQIECBAgQIBAWQUEoGUdGXURIECAAAECBAgQIECAAAECBAgQIFC3gAC0bkIdECBAgAABAgQIECBAgAABAgQIECBQVgEBaFlHRl0ECBAgQIAAAQIECBAgQIAAAQIECNQtIACtm1AHBAgQIECAAAECBAgQIECAAAECBAiUVUAAWtaRURcBAgQIECBAgAABAgQIECBAgAABAnULCEDrJtQBAQIECBAgQIAAAQIECBAgQIAAAQJlFRCAlnVk1EWAAAECBAgQIECAAAECBAgQIECAQN0CAtC6CXVAgAABAgQIECBAgAABAgQIECBAgEBZBQSgZR0ZdREgQIAAAQIECBAgQIAAAQIECBAgULeAALRuQh0QIECAAAECBAgQIECAAAECBAgQIFBWAQFoWUdGXQQIECBAgAABAgQIECBAgAABAgQI1C0gAK2bUAcECBAgQIAAAQIECBAgQIAAAQIECJRVQABa1pFRFwECBAgQIECAAAECBAgQIECAAAECdQsIQOsm1AEBAgQIECBAgAABAgQIECBAgAABAmUVEICWdWTURYAAAQIECBAgQIAAAQIECBAgQIBA3QIC0LoJdUCAAAECBAgQIECAAAECBAgQIECAQFkFBKBlHRl1ESBAgAABAgQIECBAgAABAgQIECBQt4AAtG5CHRAgQIAAAQIECBAgQIAAAQIECBAgUFYBAWhZR0ZdBAgQIECAAAECBAgQIECAAAECBAjULSAArZtQBwQIECBAgAABAgQIECBAgAABAgQIlFVAAFrWkVEXAQIECBAgQIAAAQIECBAgQIAAAQJ1CwhA6ybUAQECBAgQIECAAAECBAgQIECAAAECZRUQgJZ1ZNRFgAABAgQIECBAgAABAgQIECBAgEDdAgLQugl1QIAAAQIECBAgQIAAAQIECBAgQIBAWQUEoGUdGXURIECAAAECBAgQIECAAAECBAgQIFC3gAC0bkIdECBAgAABAgQIECBAgAABAgQIECBQVgEBaFlHRl0ECBAgQIAAAQIECBAgQIAAAQIECNQtIACtm1AHBAgQIECAAAECBAgQIECAAAECBAiUVUAAWtaRURcBAgQIECBAgAABAgQIECBAgAABAnULCEDrJtQBAQIECBAgQIAAAQIECBAgQIAAAQJlFRCAlnVk1EWAAAECBAgQIECAAAECBAgQIECAQN0CAtC6CXVAgAABAgQIECBAgAABAgQIECBAgEBZBQSgZR0ZdREgQIAAAQIECBAgQIAAAQIECBAgULeAALRuQh0QIECAAAECBAgQIECAAAECBAgQIFBWAQFoWUdGXQQIECBAgAABAgQIECBAgAABAgQI1C0gAK2bUAcECBAgQIAAAQIECBAgQIAAAQIECJRVQABa1pFRFwECBAgQIECAAAECBAgQIECAAAECdQsIQOsm1AEBAgQIECBAgAABAgQIECBAgAABAmUVEICWdWTURYAAAQIECBAgQIAAAQIECBAgQIBA3QIC0LoJdUCAAAECBAgQIECAAAECBAgQIECAQFkFBKBlHRl1ESBAgAABAgQIECBAgAABAgQIECBQt4AAtG5CHRAgQIAAAQIECBAgQIAAAQIECBAgUFYBAWhZR0ZdBAgQIECAAAECBAgQIECAAAECBAjULSAArZtQBwQIECBAgAABAgQIECBAgAABAgQIlFVAAFrWkVEXAQIECBAgQIAAAQIECBAgQIAAAQJ1CwhA6ybUAQECBAgQIECAAAECBAgQIECAAAECZRVoLmtheet688034/rrr49JkybFlClTYu21146NN944PvWpT8Vaa631nm5nzZoVl19++XuWL7nggAMOiCFDhiy5KObOnRtjx46NRx99NKZNmxZDhw6N7bbbLkaOHBlNTU0ttvWEAAECBAgQIECAAAECBAgQIECAAIHGCHSpAPSee+6Jc845J2bPnp2FkAMGDIjHHnssHnnkkfj9738f3/zmN2PEiBEtpJ9//vksyGyxcKknKdhcMgCdPn16jB49Ol599dVsyzXXXDNuu+227PHggw/GmDFjomfPnkv14ikBAgQIECBAgAABAgQIECBAgAABAstboMsEoJMnT66Gn0cddVQcfvjh0atXr+xIzf/6r/+K9Pj+978fm222WWy44YZV54kTJ2bzw4YNi3322ae6fMmZdHTnktNZZ52VhZ8777xznH766bHaaqtF2v9pp50W9913X1xyySVx8sknL9nEPAECBAgQIECAAAECBAgQIECAAAECDRDoMgHoH/7wh+zIzw9/+MNx9NFHVylTCHrcccfFK6+8EukI0bRdOnqzMlUC0BR+jho1qrK45tcJEyZkR5T26dMnzj777Ojdu3e27frrrx8XXnhhHHzwwTFu3Lj4whe+EKusskrNfqwgQIAAAQIECBAgQIAAAQIECBAgQKDzBbrMTZCeeOKJTGvPPfdsVS0drZmmdMr7klPl+eabb77k4przKURN0/Dhw6vhZ7bgf/9Jp8LvtNNOMW/evCwErSz3lQABAgQIECBAgAABAgQIECBAgACBxgh0mQA0nXZ+3XXXxS677NKq5FtvvZUtX3311avrFyxYEC+88EI0NzfHJptski1/5513stPmqxstNTN+/PhsSSVQXWp1FoCmZU8++eTSqzwnQIAAAQIECBAgQIAAAQIECBAgQGA5C3SZU+DTqe7rrbdeq3wp6Eynpadp6623rm7z8ssvx/z582PQoEFxzTXXxI033hjpLvLdu3fPlh1xxBGx7777VrdPM+lan2laMkjNFvzzn8ryyg2SllxnngABAgQIECBAgAABAgQIECBAgACB5SvQZQLQtth+9rOfxT/+8Y9I1+k84IADqptWrv+Zrg96xRVXxPve975IN0N66aWXske62dHjjz8e3/rWt6ptZs6cmc1Xgs7qin/OrLrqqtlcZbul11eep1P1U9ja2pRupnTYYYe1tmqFXjZgwIAVuv4Vufh0lPPAgQNrvoQePXrUXGdF5wqk90WtsUk3WDM1RiBd37nWuDSmInutCKyzzjo1/wjZr1+/yma+LmeB/v3713zPpEsDmRojkP6o39bPsnQAgakxAmussUbNsUnrTI0R6NmzZ81xSRU1NTU1pjB7jbXWWqvm2Lj3RuO+Qfr27VtzXObOndu4wuy55riszDRdPgC99tprIz3SL4Df/va3W1y3s3L9z/QD85xzzontttsu+15YvHhxdjToj370o7jllluy0+r32muvWLRoUcyZMyfbptYP2fQfgDS192ZPR6UuXLgw23bpf9L+u3XrtvTiFf55V3xNK8qgJPu2/Ntat6K8xhW1zrbGxrg0blTbGpdUlbEp59gYF+PSOIFy7tnPsnKOS6qqrbHxs6xx49bWuFTGrXHVrdx7bmtsvGca971hXBpn39ae2xqXttp19XVdOgC97LLL4pe//GUWfn7nO9+JbbfdtsV4HnnkkTFixIhIR1ktefp8+mZJd3NPR4Km0+KvvvrqSAFoClHT3d9nz55dM+CsBJ/pr4dtTelo1FpHqqTlKSDtalNXfE0ryhilUL0t/7Te1BiBNC61xqbWH0kaU+nKtdf0B69a45IkvGca9/3Q1nsmjZupMQLp51Wt90yt5Y2pdOXaa3uf/94zjft+aOs94/O/cePi879x9u3tua3Pf++Z9vQ6b31b7xmf/53n3l7P7X3+t9e+zOvT2a15p/wt8+5xObRL1/X8/ve/H3/84x8jBZH/9m//lt21feldp6M4t9xyy6UXV59/+MMfzgLQF198MTv6MwWg6TT5dH3PGTNmVLdbcqayvFa4Wdl27Nixldn3fJ0+fXpMnTr1PctX9AXpdZkaI5A+fNr6nkrvGVNjBNp6v1d+njSmspV7r+mPWW29Z1Zunca++jfeeCO7fndrVcyaNau1xZYtB4FkX+s9U+uSP8uhrJV+F+k/prXGJeG4PEHjvkXefvvtmmOT1pkaI5B+J27rPSNoa8y4pL2mmxrXGpv2Lj/XuKq7/p7TwWG1xqVycFjXVyjnK6w1LuWsdtmrWnfddZd946W27DJ3ga+8rhQYfP3rX8/Cz3Q9znQa+/DhwyurO/Q1XWcsTemXw8oP1RSApqlWMJHuIp8m1+7JGPxDgAABAgQIECBAgAABAgQIECBAoKECXSoATeHjiSeeGE888URssMEGcemll8b73//+msA33HBDtk061b21acqUKdniFKRWrvm59tprZ8teeOGF1ppEZXlbR5a22tBCAgQIECBAgAABAgQIECBAgAABAgQKF+gyAWi6xkG6W/ukSZNi8803z4LNDTfcsE2wO+64I371q1/FVVdd1ep2DzzwQLZ86623rq5P1wxNU2q79JROM7rrrruyxZUbKi29jecECBAgQIAAAQIECBAgQIAAAQIECCw/gS4TgP7hD3+Ip556KrtG5w9+8IPsxkbtMe69997ZJim0TMHpktNjjz0W6QjRNB1zzDHVVbvssksMHjw4Jk6cGOPGjasuTzMpTE3Xudpoo41i5513brHOEwIECBAgQIAAAQIECBAgQIAAAQIElr9Al7gJUrq4bjrdPU3p5ggHHXRQTckhQ4bEFVdcka0/5JBD4sEHH8xOmf/85z8fw4YNyx7PP/983H333dk2o0ePzo4orXSY7hB/3HHHZTdWOuecc+Khhx6KoUOHZuFrmu/Ro0eccsopkbYzESBAgAABAgQIECBAgAABAgQIECDQWIEuEYCmu7QveVOitu7Ol+6GXZmampri/PPPz47cvOaaayId9ZkeaUqnz3/lK1+JdMTn0tOHPvShuOiiiyIFoCkorYSl6cjQk046Kbbddtulm3hOgAABAgQIECBAgAABAgQIECBAgEADBLpEALrFFlvE/fffn4uvd+/e2SnuRx55ZLz22msxffr02GSTTaJ///5t9rf99ttnp8inU95fffXVSDdHGjhwYHTv3mWuKtDm67eSAAECBAgQIECAAAECBAgQIECAwIog0CUC0CKgm5ubY9CgQdmjI/0NGDAg0sNEgAABAgQIECBAgAABAgQIECBAgED5BByuWL4xUREBAgQIECBAgAABAgQIECBAgAABAgUJCEALgtQNAQIECBAgQIAAAQIECBAgQIAAAQLlExCAlm9MVESAAAECBAgQIECAAAECBAgQIECAQEECAtCCIHVDgAABAgQIECBAgAABAgQIECBAgED5BASg5RsTFREgQIAAAQIECBAgQIAAAQIECBAgUJCAALQgSN0QIECAAAECBAgQIECAAAECBAgQIFA+AQFo+cZERQQIECBAgAABAgQIECBAgAABAgQIFCQgAC0IUjcECBAgQIAAAQIECBAgQIAAAQIECJRPQABavjFREQECBAgQIECAAAECBAgQIECAAAECBQkIQAuC1A0BAgQIECBAgAABAgQIECBAgAABAuUTEICWb0xURIAAAQIECBAgQIAAAQIECBAgQIBAQQIC0IIgdUOAAAECBAgQIECAAAECBAgQIECAQPkEBKDlGxMVESBAgAABAgQIECBAgAABAgQIECBQkIAAtCBI3RAgQIAAAQIECBAgQIAAAQIECBAgUD4BAWj5xkRFBAgQIECAAAECBAgQIECAAAECBAgUJCAALQhSNwQIECBAgAABAgQIECBAgAABAgQIlE9AAFq+MVERAQIECBAgQIAAAQIECBAgQIAAAQIFCQhAC4LUDQECBAgQIECAAAECBAgQIECAAAEC5RMQgJZvTFREgAABAgQIECBAgAABAgQIECBAgEBBAgLQgiB1Q4AAAQIECBAgQIAAAQIECBAgQIBA+QQEoOUbExURIECAAAECBAgQIECAAAECBAgQIFCQgAC0IEjdECBAgAABAgQIECBAgAABAgQIECBQPgEBaPnGREUECBAgQIAAAQIECBAgQIAAAQIECBQkIAAtCFI3BAgQIECAAAECBAgQIECAAAECBAiUT0AAWr4xUREBAgQIECBAgAABAgQIECBAgAABAgUJCEALgtQNAQIECBAgQIAAAQIECBAgQIAAAQLlExCAlm9MVESAAAECBAgQIECAAAECBAgQIECAQEECAtCCIHVDgAABAgQIECBAgAABAgQIECBAgED5BASg5RsTFREgQIAAAQIECBAgQIAAAQIECBAgUJCAALQgSN0QIECAAAECBAgQIECAAAECBAgQIFA+AQFo+cZERQQIECBAgAABAgQIECBAgAABAgQIFCQgAC0IUjcECBAgQIAAAQIECBAgQIAAAQIECJRPQABavjFREQECBAgQIECAAAECBAgQIECAAAECBQkIQAuC1A0BAgQIECBAgAABAgQIECBAgAABAuUTEICWb0xURIAAAQIECBAgQIAAAQIECBAgQIBAQQIC0IIgdUOAAAECBAgQIECAAAECBAgQIECAQPkEBKDlGxMVESBAgAABAgQIECBAgAABAgQIECBQkIAAtCBI3RAgQIAAAQIECBAgQIAAAQIECBAgUD4BAWj5xkRFBAgQIECAAAECBAgQIECAAAECBAgUJCAALQhSNwQIECBAgAABAgQIECBAgAABAgQIlE9AAFq+MVERAQIECBAgQIAAAQIECBAgQIAAAQIFCQhAC4LUDQECBAgQIECAAAECBAgQIECAAAEC5RMQgJZvTFREgAABAgQIECBAgAABAgQIECBAgEBBAgLQgiB1Q4AAAQIECBAgQIAAAQIECBAgQIBA+QQEoOUbExURIECAAAECBAgQIECAAAECBAgQIFCQgAC0IEjdECBAgAABAgQIECBAgAABAgQIECBQPgEBaPnGREUECBAgQIAAAQIECBAgQIAAAQIECBQkIAAtCFI3BAgQIECAAAECBAgQIECAAAECBAiUT0AAWr4xUREBAgQIECBAgAABAgQIECBAgAABAgUJCEALgtQNAQIECBAgQIAAAQIECBAgQIAAAQLlExCAlm9MVESAAAECBAgQIECAAAECBAgQIECAQEECAtCCIHVDgAABAgQIECBAgAABAgQIECBAgED5BASg5RsTFREgQIAAAQIECBAgQIAAAQIECBAgUJCAALQgSN0QIECAAAECBAgQIECAAAECBAgQIFA+AQFo+cZERQQIECBAgAABAgQIECBAgAABAgQIFCQgAC0IUjcECBAgQIAAAQIECBAgQIAAAQIECJRPQABavjFREQECBAgQIECAAAECBAgQIECAAAECBQkIQAuC1A0BAgQIECBAgAABAgQIECBAgAABAuUTEICWb0xURIAAAQIECBAgQIAAAQIECBAgQIBAQQIC0IIgdUOAAAECBAgQIECAAAECBAgQIECAQPkEBKDlGxMVESBAgAABAgQIECBAgAABAgQIECBQkIAAtCBI3RAgQIAAAQIECBAgQIAAAQIECBAgUD4BAWj5xkRFBAgQIECAAAECBAgQIECAAAECBAgUJCAALQhSNwQIECBAgAABAgQIECBAgAABAgQIlE9AAFq+MVERAQIECBAgQIAAAQIECBAgQIAAAQIFCQhAC4LUDQECBAgQIECAAAECBAgQIECAAAEC5RMQgJZvTFREgAABAgQIECBAgAABAgQIECBAgEBBAgLQgiB1Q4AAAQIECBAgQIAAAQIECBAgQIBA+QQEoOUbExURIECAAAECBAgQIECAAAECBAgQIFCQgAC0IEjdECBAgAABAgQIECBAgAABAgQIECBQPgEBaPnGREUECBAgQIAAAQIECBAgQIAAAQIECBQkIAAtCFI3BAgQIECAAAECBAgQIECAAAECBAiUT0AAWr4xUREBAgQIECBAgAABAgQIECBAgAABAgUJCEALgtQNAQIECBAgQIAAAQIECBAgQIAAAQLlExCAlm9MVESAAAECBAgQIECAAAECBAgQIECAQEECAtCCIHVDgAABAgQIECBAgAABAgQIECBAgED5BASg5RsTFREgQIAAAQIECBAgQIAAAQIECBAgUJCAALQgSN0QIECAAAECBAgQIECAAAECBAgQIFA+AQFo+cZERQQIECBAgAABAgQIECBAgAABAgQIFCQgAC0IUjcECBAgQIAAAQIECBAgQIAAAQIECJRPQABavjFREQECBAgQIECAAAECBAgQIECAAAECBQkIQAuC1A0BAgQIECBAgAABAgQIECBAgAABAuUTEICWb0xURIAAAQIECBAgQIAAAQIECBAgQIBAQQIC0IIgdUOAAAECBAgQIECAAAECBAgQIECAQPkEBKDlGxMVESBAgAABAgQIECBAgAABAgQIECBQkIAAtCBI3RAgQIAAAQIECBAgQIAAAQIECBAgUD4BAWj5xkRFBAgQIECAAAECBAgQIECAAAECBAgUJCAALQhSNwQIECBAgAABAgQIECBAgAABAgQIlE9AAFq+MVERAQIECBAgQIAAAQIECBAgQIAAAQIFCQhAC4LUDQECBAgQIECAAAECBAgQIECAAAEC5RMQgJZvTFREgAABAgQIECBAgAABAgQIECBAgEBBAgLQgiB1Q4AAAQIECBAgQIAAAQIECBAgQIBA+QQEoOUbExURIECAAAECBAgQIECAAAECBAgQIFCQQHNB/eimQIHu3btH//79C+yxHF316dOnHIWshFW09z3V1NS0EqqU4yWn90Wt93uvXr3KUeRKWEVzc3PNcVkJOUr1kvv161dzbHr27FmqWlemYpJ9rZ9lacxMjRHo1q1bzXFJFaWfdabGCLT1+d+7d+/GFGWvkX4nrvWzLPGk36lNjRHw+d8Y9/b22qNHj5rvmbTO1DiBtn6WNa6qxu7Zbz2N9W917+mDtyuGhV3xNbU6gCVcmH5Za+s/oH6Za9ygpfdFrbERgDZuXFIoUGtcGleVPSeBNC61xsYv2o37Hkn2tcalb9++jStsJd9zCkBrjUui8QfQxn2DpM/4WmMjAG3cuKT3RK1xSVWl95SpMQJt/c7sD6CNGZO017Y+//2RrXHjkvbc1s+yxlbWuL0LQBtnX3PP8+fPj3feeafm+hV1xVtvvbWilr7C171gwYKYMmVKzdeRvudMjRFI74taY9MVfw40Rrnje50zZ07Ncel4b1oUKfD666/H3LlzW+1y5syZrS63sPMFkn2tn2VTp07t/ALsoVWBRYsW1RyX1KDWe6nVziwsVGD69Ok1xyatMzVGYN68eTXHJVW0cOHCxhRmr/HGG2/UHJt3332XUIMEZs2aVXNcfMY0aFD+udtav5c1tqr6977uuuvm7sQx/LnpNCRAgAABAgQIECBAgAABAgQIECBAoOwCAtCyj5D6CBAgQIAAAQIECBAgQIAAAQIECBDILSAAzU2nIQECBAgQIECAAAECBAgQIECAAAECZRcQgJZ9hNRHgAABAgQIECBAgAABAgQIECBAgEBuAQFobjoNCRAgQIAAAQIECBAgQIAAAQIECBAou4AAtOwjpD4CBAgQIECAAAECBAgQIECAAAECBHILCEBz02lIgAABAgQIECBAgAABAgQIECBAgEDZBQSgZR8h9REgQIAAAQIECBAgQIAAAQIECBAgkFtAAJqbTkMCBAgQIECAAAECBAgQIECAAAECBMouIAAt+wipjwABAgQIECBAgAABAgQIECBAgACB3AIC0Nx0GhIgQIAAAQIECBAgQIAAAQIECBAgUHYBAWjZR0h9BAgQIECAAAECBAgQIECAAAECBAjkFhCA5qbTkAABAgQIECBAgAABAgQIECBAgACBsgsIQMs+QuojQIAAAQIECBAgQIAAAQIECBAgQCC3gAA0N52GBAgQIECAAAECBAgQIECAAAECBAiUXUAAWvYRUh8BAgQIECBAgAABAgQIECBAgAABArkFBKC56TQkQIAAAQIECBAgQIAAAQIECBAgQKDsAgLQso+Q+ggQIECAAAECBAgQIECAAAECBAgQyC0gAM1NpyEBAgQIECBAgAABAgQIECBAgAABAmUXEICWfYTUR4AAAQIECBAgQIAAAQIECBAgQIBAbgEBaG46DQkQIECAAAECBAgQIECAAAECBAgQKLuAALTsI6Q+AgQIECBAgAABAgQIECBAgAABAgRyCwhAc9NpSIAAAQIECBAgQIAAAQIECBAgQIBA2QUEoGUfIfURIECAAAECBAgQIECAAAECBAgQIJBbQACam05DAgQIECBAgAABAgQIECBAgAABAgTKLiAALfsIqY8AAQIECBAgQIAAAQIECBAgQIAAgdwCAtDcdBoSIECAAAECBAgQIECAAAECBAgQIFB2AQFo2UdIfQQIECBAgAABAgQIECBAgAABAgQI5BYQgOam05AAAQIECBAgQIAAAQIECBAgQIAAgbILCEDLPkLqI0CAAAECBAgQIECAAAECBAgQIEAgt4AANDedhgQIECBAgAABAgQIECBAgAABAgQIlF1AAFr2EVIfAQIECBAgQIAAAQIECBAgQIAAAQK5BQSguek0JECAAAECBAgQIECAAAECBAgQIECg7AIC0LKPkPoIECBAgAABAgQIECBAgAABAgQIEMgtIADNTachAQIECBAgQIAAAQIECBAgQIAAAQJlFxCAln2E1EeAAAECBAgQIECAAAECBAgQIECAQG4BAWhuOg0JECBAgAABAgQIECBAgAABAgQIECi7gAC07COkPgIECBAgQIAAAQIECBAgQIAAAQIEcgsIQHPTaUiAAAECBAgQIECAAAECBAgQIECAQNkFBKBlHyH1ESBAgAABAgQIECBAgAABAgQIECCQW0AAmptOQwIECBAgQIAAAQIECBAgQIAAAQIEyi4gAC37CKmPAAECBAgQIECAAAECBAgQIECAAIHcAgLQ3HQaEiBAgAABAgQIECBAgAABAgQIECBQdgEBaNlHSH0ECBAgQIAAAQIECBAgQIAAAQIECOQWEIDmptOQAAECBAgQIECAAAECBAgQIECAAIGyCwhAyz5C6iNAgAABAgQIECBAgAABAgQIECBAILeAADQ3nYYECBAgQIAAAQIECBAgQIAAAQIECJRdQABa9hFSHwECBAgQIECAAAECBAgQIECAAAECuQUEoLnpNCRAgAABAgQIECBAgAABAgQIECBAoOwCAtCyj5D6CBAgQIAAAQIECBAgQIAAAQIECBDILSAAzU2nIQECBAgQIECAAAECBAgQIECAAAECZRcQgJZ9hNRHgAABAgQIECBAgAABAgQIECBAgEBuAQFobjoNCRAgQIAAAQIECBAgQIAAAQIECBAou4AAtOwjpD4CBAgQIECAAAECBAgQIECAAAECBHILCEBz02lIgAABAgQIECBAgAABAgQIECBAgEDZBQSgZR8h9REgQIAAAQIECBAgQIAAAQIECBAgkFtAAJqbTkMCBAgQIECAAAECBAgQIECAAAECBMouIAAt+wipjwABAgQIECBAgAABAgQIECBAgACB3AIC0Nx0GhIgQIAAAQIECBAgQIAAAQIECBAgUHYBAWjZR0h9BAgQIECAAAECBAgQIECAAAECBAjkFhCA5qbTkAABAgQIECBAgAABAgQIECBAgACBsgsIQMs+QuojQIAAAQIECBAgQIAAAQIECBAgQCC3gAA0N52GBAgQIECAAAECBAgQIECAAAECBAiUXUAAWvYRUh8BAgQIECBAgAABAgQIECBAgAABArkFBKC56TQkQIAAAQIECBAgQIAAAQIECBAgQKDsAgLQso+Q+ggQIECAAAECBAgQIECAAAECBAgQyC0gAM1NpyEBAgQIECBAgAABAgQIECBAgAABAmUXEICWfYTUR4AAAQIECBAgQIAAAQIECBAgQIBAbgEBaG46DQkQIECAAAECBAgQIECAAAECBAgQKLuAALTsI6Q+AgQIECBAgAABAgQIECBAgAABAgRyCwhAc9NpSIAAAQIECBAgQIAAAQIECBAgQIBA2QUEoGUfIfURIECAAAECBAgQIECAAAECBAgQIJBbQACam05DAgQIECBAgAABAgQIECBAgAABAgTKLiAALfsIqY8AAQIECBAgQIAAAQIECBAgQIAAgdwCAtDcdBoSIECAAAECBAgQIECAAAECBAgQIFB2AQFo2UdIfQQIECBAgAABAgQIECBAgAABAgQI5BYQgOam05AAAQIECBAgQIAAAQIECBAgQIAAgbILCEDLPkLqI0CAAAECBAgQIECAAAECBAgQIEAgt4AANDedhgQIECBAgAABAgQIECBAgAABAgQIlF1AAFr2EVIfAQIECBAgQIAAAQIECBAgQIAAAQK5BQSguek0JGbSXXAAAC2wSURBVECAAAECBAgQIECAAAECBAgQIECg7AIC0LKPkPoIECBAgAABAgQIECBAgAABAgQIEMgtIADNTachAQIECBAgQIAAAQIECBAgQIAAAQJlFxCAln2E1EeAAAECBAgQIECAAAECBAgQIECAQG4BAWhuOg0JECBAgAABAgQIECBAgAABAgQIECi7gAC07COkPgIECBAgQIAAAQIECBAgQIAAAQIEcgsIQHPTaUiAAAECBAgQIECAAAECBAgQIECAQNkFBKBlHyH1ESBAgAABAgQIECBAgAABAgQIECCQW0AAmptOQwIECBAgQIAAAQIECBAgQIAAAQIEyi4gAC37CKmPAAECBAgQIECAAAECBAgQIECAAIHcAgLQ3HQaEiBAgAABAgQIECBAgAABAgQIECBQdgEBaNlHSH0ECBAgQIAAAQIECBAgQIAAAQIECOQWEIDmptOQAAECBAgQIECAAAECBAgQIECAAIGyCwhAyz5C6iNAgAABAgQIECBAgAABAgQIECBAILeAADQ3nYYECBAgQIAAAQIECBAgQIAAAQIECJRdoLnsBZa1vrlz58bYsWPj0UcfjWnTpsXQoUNju+22i5EjR0ZTU1NZy1YXAQIECBAgQIAAAQIECBAgQIAAgZVKQACaY7inT58eo0ePjldffTVrveaaa8Ztt92WPR588MEYM2ZM9OzZM0fPmhAgQIAAAQIECBAgQIAAAQIECBAgUKSAU+BzaJ511llZ+LnzzjvHzTffHL/73e/i2muvjU033TTuu+++uOSSS3L0qgkBAgQIECBAgAABAgQIECBAgAABAkULCEA7KDphwoR45JFHok+fPnH22WfHaqutlvWw/vrrx4UXXpid/j5u3LiYMWNGB3u2OQECBAgQIECAAAECBAgQIECAAAECRQsIQDsoes8992Qthg8fHr17927ROp0Kv9NOO8W8efMihaAmAgQIECBAgAABAgQIECBAgAABAgQaKyAA7aD/+PHjsxbp9PfWphSApunJJ59sbbVlBAgQIECAAAECBAgQIECAAAECBAgsRwE3Qeog9uTJk7MWq6++eqstK8srN0hqdaP/XXjjjTfGnDlzWl299dZbx0YbbdTquhV54ZJHzE55+cW4+4arV+SXU/raFy5YUK2xe/fu0bdv3+rzpWfS+sr0wE3XR7ObeFU4OuXrf780qdpvel/UGpslb6b2wlN/856pqnXOzJv/81q146ampprjUt3of2fmzv5/7d0JmBTF+cfxdwFF5AqHBFDkEkGU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AQNKHNqePXusS5cutmzZMqtWrZrNnj3bTj311BLrMQMBBBBAAAEEEEAgPwQIgObHeeYoEUAAAQQQQACBnBCYNWuW9erVy/QQU926dW3p0qXWokWLYsc2ePBgGzlypJt3xx132H333VdseeIb7UuPyquVqPbXvHlz69y5s3Xq1Mlq1aqVuHrS919++aUtX77c/axfv95atWpl7dq1s44dO/r2O/r555/bxo0brX79+ta+fXs3/dprr7lXtV5VK1cSAggggAACCCCAQOUFCIBW3pA9IIAAAggggAACCIQocOONN9ojjzziclS/nq+//nosdwUxTzzxRNu3b5/94Ac/sAULFtjBBx8cW5448dlnn9kll1xiemQ+MTVp0sT1PVpa36FffPGFG2jpnXfeSdzcvT/kkEPs7rvvtkGDBlmNGjWKraPWq48//rideeaZdu+991qfPn1sx44dsXWGDx9u6seUhAACCCCAAAIIIFA5AQZBqpwfWyOAAAIIIIAAAgiELKAWnW3btnW5vvHGG6ZWk0pqyamgooKfNWvWtBdeeKHU4Oerr77qWnoq+FlQUGAnnXSSXXHFFS4QWa9ePdcS85xzzrHbb7/d7T/x11tvvWXHHXecKfipR+1PO+00u/TSS+3iiy+2H/7wh271b775xu68804XBE3c3nuv0eovuuiiYsFPLTvrrLO8VXhFAAEEEEAAAQQQqIQALUArgcemCCCAAAIIIIAAAlUj8O6771rPnj1d0LN169bu0fXnnnsu1ifoAw884Fpd+pVu27Zt7hH1LVu2uEfon3/+ebc/b33Nv/DCC01BTqU5c+aU6EdUAdOFCxdao0aNbMaMGe6ReW97vc6dO9fOPvtsKyoqsgYNGtjatWvt0EMPja3itQD1Zihwes0119jOnTtt3rx5rlWot4xXBBBAAAEEEEAAgeACtAANbseWCCCAAAIIIIAAAlUkoNaWN9xwg8t99erVduutt5r6+1RSYPSWW25x036/hg0bZgpyquXmpEmTigU/tY2Cmm+++abrm1PvldeBAwc06ZIClAp+Kqm/UfUXmpjUj+f111/vZivg+umnnyauEnvfvXt3UwC3R48e1q9fP4KfMRkmEEAAAQQQQACBygsQAK28IXtAAAEEEEAAAQQQqAIBBR6POuool7NGhN++fbvp0fVnn33WBTb9irR//36bOHGi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" width="672" style="display: block; margin: auto;" /></p>
 </div>
 </div>
 
