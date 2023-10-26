@@ -1,5 +1,5 @@
 ---
-title: "Wisconsin Football Analysis"
+title: "Wisconsin Football Geographic Analysis"
 output: html_document
 ---
 
@@ -209,4 +209,26 @@ ggplot(var_americas, aes(Year, dists)) +
 
 > The variance tells a similar story. There was a small hill in the mid-2010s, which dipped closer to COVID, and is now on an upward trend.
 
+One of the more impactful changes in college football has been the transfer portal and NIL (Name, Image and Likeness). Coming into affect in the summer of 2021, it has changed the landscape of college football, along with the other schools. How has recruiting changed for Wisconsin since?
 
+```{r}
+var_pre2021 = american_dists %>% 
+  group_by(Year) %>% 
+  summarize(dists = var(dist_madison/1000)) %>% 
+  filter(Year < 2021)
+
+var_2021 = american_dists %>% 
+  group_by(Year) %>% 
+  summarize(dists = var(dist_madison/1000)) %>% 
+  filter(Year >= 2021)
+
+years = c("2010-2021", "2021-2023")
+avgs = c(mean(var_pre2021$dists), mean(var_2021$dists))
+ggplot(data.frame(years, avgs), aes(x=years, y=avgs)) +
+  geom_col(width=0.4, fill = "lightblue", color="black") + 
+  ylab("Average Variance (km)") +
+  xlab("Years") +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+```
+
+> We see that over the last few years, Wisconsin has branched out a little more, and that could be due to NIL/transfer portal changes, or even recent head coaching changes.
