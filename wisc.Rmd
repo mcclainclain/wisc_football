@@ -3,6 +3,12 @@ title: "Wisconsin Football Analysis"
 output: html_document
 ---
 
+<style type="text/css">
+  body{
+  font-size: 12pt;
+}
+</style>
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo=T,eval=T,message=F,warning=F,fig.align='center')
 library(tidyverse)
@@ -127,6 +133,8 @@ m = leaflet() %>%
 m
 ```
 
+### Distance Analysis
+
 Getting distance from Madison, WI for all cities in our dataset.
 ```{r}
 
@@ -146,17 +154,59 @@ for (i in 1:nrow(players_raw)){
 year_dists$dist_madison = madison_dists
 ```
 
-Average Distance From Madison by Year
+
 ```{r}
 avg_distances = year_dists %>% 
   group_by(Year) %>% 
   summarize(avg_dist = mean(dist_madison/1000))
 
-ggplot(avg_distances, aes(Year, avg_dist)) +
-  geom_col(fill="lightblue", color="black") +
-  ylab("Distance (km)") +
-  ggtitle("Average Distance from Madison of UW Football Players")
+farthest_usa_dist = (year_dists %>% filter(Hometown == "Kauai, Hawaii") %>% pull(dist_madison))[1]
+american_dists = year_dists %>% filter(dist_madison <= farthest_usa_dist)
+
+avg_usa_distances = american_dists %>% 
+  group_by(Year) %>% 
+  summarize(avg_dist = mean(dist_madison/1000))
+
+avg_cusa_distances = american_dists %>% 
+  filter(!endsWith(Hometown, "Hawaii")) %>% 
+  group_by(Year) %>% 
+  summarize(avg_dist = mean(dist_madison/1000))
+
+far_players = sqldf("SELECT Name, Pos, Hometown, Year, dist_madison FROM american_dists")
+sqldf("SELECT DISTINCT far_players.Name, far_players.Pos, far_players.Hometown, player_years.FirstYear as FirstYear, player_years.LastYear as LastYear, far_players.dist_madison/1000 as 'Distance(km)' FROM far_players LEFT JOIN player_years ON far_players.Name=player_years.Name ORDER BY far_players.dist_madison DESC LIMIT 5") %>% show_table()
 ```
 
+We see that most of the variance (in the USA) will likely come from Hawaii. Let's see how that plays out.
+
+
+```{r}
+ggplot() +
+  geom_smooth(data=avg_distances, mapping=aes(Year, avg_dist, color="Worldwide"), size=1.25, se=F) +
+  geom_smooth(data=avg_usa_distances, mapping=aes(Year, avg_dist, color="USA"), size=1.25, se=F) +
+  geom_smooth(data=avg_cusa_distances, mapping=aes(Year, avg_dist, color="Continental USA"), size=1.25, se=F) +
+  scale_color_manual(name='Region',
+                     breaks=c('Worldwide', 'USA', 'Continental USA'),
+                     values=c('Worldwide'='black', 'USA'='red', 'Continental USA'='blue')) +
+  scale_x_continuous(breaks=c(2013, 2015, 2017, 2019, 2021, 2023)) +
+  ylab("Distance (km)")
+
+```
+> We see in this graph how the distances can change based on what values we can leave out. We see that as we remove higher distances which can skew the average, our graph evens out more, to show more true changes. We can possibly see that there might be an upward trend right now in getting recruits that aren't as close to UW.
+
+Let's also do it by variance (using just USA), for more accuracy, as this tells us more about the distance from the average, giving a better representation of the "spread" of our geographic points.
+
+```{r}
+var_americas = avg_cusa_distances = american_dists %>% 
+  group_by(Year) %>% 
+  summarize(dists = var(dist_madison/1000))
+
+ggplot(var_americas, aes(Year, dists)) +
+  geom_smooth(se=F, color="black") +
+  ggtitle("Variance in Distance of American UW Football Hometowns") +
+  ylab("Variance") +
+  theme(axis.text = element_blank(), axis.ticks = element_blank())
+```
+
+> The variance tells a similar story. There was a small hill in the mid-2010s, which dipped closer to COVID, and is now on an upward trend.
 
 
